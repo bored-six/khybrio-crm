@@ -1,0 +1,10 @@
+{
+  "name": "khybrio-crm",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Khybrio CRM dashboard on top of the Khybrio Records Airtable base",
+  "engines": {
+    "node": ">=18"
+  }
+}
