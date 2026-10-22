@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <title>Khybrio CRM</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20200%20200'%3E%3Crect%20width='200'%20height='200'%20rx='44'%20fill='%231C4D4A'/%3E%3Cg%20fill='%23F5F7F6'%3E%3Cpath%20d='M66.77%20114.49%20L31.19%2095.6%20L69.04%20109.4%20Z%20M66.05%20121.4%20L14.18%20114.98%20L66.44%20115.84%20Z%20M67.46%20127.49%20L8.38%20139.35%20L66.11%20122.09%20Z%20M70.68%20132.86%20L30.03%20154.97%20L67.73%20128.13%20Z%20M75.4%20136.96%20L37.15%20178.22%20L71.14%20133.38%20Z%20M81.16%20139.41%20L53.78%20199.74%20L76%20137.32%20Z%20M87.4%20139.95%20L81.54%20183.84%20L81.84%20139.56%20Z%20M93.49%20138.54%20L104.39%20193.74%20L88.09%20139.89%20Z%20M99.38%20134.86%20L120.67%20171.4%20L94.77%20137.98%20Z%20M103.98%20128.77%20L129.11%20149.08%20L100.86%20133.38%20Z'/%3E%3Ccircle%20cx='86'%20cy='120'%20r='19'/%3E%3Cpath%20d='M110%2048%20h15%20v88%20h-15%20Z%20M122%2092%20L154%2050%20L166%2060%20L134%20100%20Z%20M120%2090%20L156%20128%20L146%20138%20L112%20104%20Z'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="/brand/favicon.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <meta name="theme-color" content="#1c4d4a">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap">
@@ -56,7 +57,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;backgroun
 header.top .btn{background:transparent;color:var(--band-fg);border-color:var(--band-line)}
 header.top .btn:hover{background:rgba(245,247,246,.08)}
 header.top .btn.primary{background:var(--hot);border-color:var(--hot);color:#fff}
-.logo{width:34px;height:34px;flex:0 0 auto;display:block}
+.logo{width:40px;height:40px;flex:0 0 auto;display:block}
 .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:12px}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
 .brand h1{font-size:23px;line-height:1;color:var(--band-fg)}
@@ -231,7 +232,7 @@ a{color:var(--accent)}
 .loginbox h1{font-size:34px;font-weight:400;color:var(--ink)}
 .loginbox h1 em{color:var(--teal-bright)}
 .loginbox .muted{color:#5a7370}
-.loginbox .logo{width:52px;height:52px}
+.loginbox .logo{width:56px;height:56px;border-radius:14px}
 .loginbox .btn.primary{background:var(--teal-deep);border-color:var(--teal-deep);color:var(--cream);justify-content:center;padding-block:10px}
 .loginbox .formerr{color:#c2410c}
 .loginfoot{font-size:12px;color:#5a7370;text-align:center}.loginbox p{margin:0}
@@ -246,7 +247,7 @@ html{padding-top:env(safe-area-inset-top,0px)}
 <header class="top">
   <div class="wrap">
     <div class="bar">
-      <div class="brand"><svg class="logo" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="44" fill="#F5F7F6" fill-opacity=".1"/><g fill="#F5F7F6"><path d="M66.77 114.49 L31.19 95.6 L69.04 109.4 Z M66.05 121.4 L14.18 114.98 L66.44 115.84 Z M67.46 127.49 L8.38 139.35 L66.11 122.09 Z M70.68 132.86 L30.03 154.97 L67.73 128.13 Z M75.4 136.96 L37.15 178.22 L71.14 133.38 Z M81.16 139.41 L53.78 199.74 L76 137.32 Z M87.4 139.95 L81.54 183.84 L81.84 139.56 Z M93.49 138.54 L104.39 193.74 L88.09 139.89 Z M99.38 134.86 L120.67 171.4 L94.77 137.98 Z M103.98 128.77 L129.11 149.08 L100.86 133.38 Z"/><circle cx="86" cy="120" r="19"/><path d="M110 48 h15 v88 h-15 Z M122 92 L154 50 L166 60 L134 100 Z M120 90 L156 128 L146 138 L112 104 Z"/></g></svg><h1>Khybrio <span>CRM</span></h1><span class="tag">Clients &amp; pipeline</span></div>
+      <div class="brand"><img class="logo" src="/brand/khybrio-glyph.png" alt=""><h1>Khybrio <span>CRM</span></h1><span class="tag">Clients &amp; pipeline</span></div>
       <div class="sync" id="sync"><span class="dot" id="syncDot"></span><span id="syncText">Connecting to Airtable…</span></div>
       <button class="btn small" id="refreshBtn" type="button">Refresh</button>
       <button class="btn small ghost" id="logoutBtn" type="button" hidden>Log out</button>
@@ -350,7 +351,7 @@ function showBanner(code,msg){const b=$("#banner");pageErr=code;setSync();
 function clearBanner(){pageErr=null;$("#banner").hidden=true}
 
 /* ---------- login ---------- */
-function loginLogo(){const t=document.createElement("template");t.innerHTML='<svg class="logo" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="44" fill="#1C4D4A"/><g fill="#F5F7F6"><path d="M66.77 114.49 L31.19 95.6 L69.04 109.4 Z M66.05 121.4 L14.18 114.98 L66.44 115.84 Z M67.46 127.49 L8.38 139.35 L66.11 122.09 Z M70.68 132.86 L30.03 154.97 L67.73 128.13 Z M75.4 136.96 L37.15 178.22 L71.14 133.38 Z M81.16 139.41 L53.78 199.74 L76 137.32 Z M87.4 139.95 L81.54 183.84 L81.84 139.56 Z M93.49 138.54 L104.39 193.74 L88.09 139.89 Z M99.38 134.86 L120.67 171.4 L94.77 137.98 Z M103.98 128.77 L129.11 149.08 L100.86 133.38 Z"/><circle cx="86" cy="120" r="19"/><path d="M110 48 h15 v88 h-15 Z M122 92 L154 50 L166 60 L134 100 Z M120 90 L156 128 L146 138 L112 104 Z"/></g></svg>';return t.content.firstChild}
+function loginLogo(){return h("img",{class:"logo",src:"/brand/khybrio-mark.png",alt:"Khybrio"})}
 
 let authed=false;
 function showLogin(msg){authed=false;
