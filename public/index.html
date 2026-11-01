@@ -240,6 +240,17 @@ a{color:var(--accent)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 [hidden]{display:none!important}
 html{padding-top:env(safe-area-inset-top,0px)}
+
+/* money */
+.monthnav{display:flex;align-items:center;gap:2px}
+.monthnav .mono{min-width:112px;text-align:center;font-weight:600}
+.kpis.money .val{white-space:nowrap}
+table.ledger td.in{color:var(--ok)}
+table.ledger td.bal{font-weight:600}
+table.ledger td.bal.neg{color:var(--hot)}
+table.ledger tr.opening td{background:var(--sunk);color:var(--muted);font-style:italic;cursor:default}
+.ledger-list{display:none}
+@media (max-width:560px){table.ledger,.tablewrap:has(table.ledger){display:none}.ledger-list{display:flex}.kpis.money{grid-template-columns:1fr 1fr}.kpis.money .kpi:last-child{grid-column:1/-1}.monthnav{order:3;width:100%;justify-content:space-between}.monthnav .btn.small{min-height:44px}}
 </style>
 </head>
 <body>
@@ -260,6 +271,7 @@ html{padding-top:env(safe-area-inset-top,0px)}
       <button type="button" role="tab" data-tab="followups">Follow-ups <span class="badge" id="bFu">0</span></button>
       <button type="button" role="tab" data-tab="won">Deals won</button>
       <button type="button" role="tab" data-tab="billing">Quotes &amp; billing</button>
+      <button type="button" role="tab" data-tab="money">Money</button>
     </nav>
   </div>
 </header>
@@ -286,6 +298,8 @@ const T={
   IN:{id:"tblS66t7fb8lBerx3",f:{no:"fldHGOnJLM5iUOqVp",client:"fldkXxrm7x6c912xK",contract:"fld2woAJDFobgWXMm",status:"fldeMCURqiU3XvEcO",issue:"fld99Pg1qKj2z0VAc",due:"fld0MVrzNSOIdGuY6",amount:"fldiWiKSZPWUKhzMT",paid:"fldlLuammqqCFduNd",method:"fldDXt0AoizW0avf1",pdf:"fldtDDrJ3p2MKkw9k",notes:"fldzMqvx4HGVcIfbu"}},
   AC:{id:"tblhhCSBErRCDmpgE",f:{summary:"fldsGwSSufwJYbzI4",client:"fld8HNXNElXhxlksV",type:"fldDd6XalzZOCxj4D",date:"fldIskzZHWJkKwntP",details:"flduBozAR0Qh8g8hL",outcome:"fldCGptcXnhg49Z3R",by:"fldYb0sn3X47y0kZd"}}
 };
+/* TODO: replace tblEXPENSES_TODO and every fld*_TODO below with the real ids once the Expenses table exists (see plans/money-ledger-spec.md section 1) */
+T.EX={id:"tblEXPENSES_TODO",f:{desc:"fldEXdesc_TODO",date:"fldEXdate_TODO",amount:"fldEXamount_TODO",category:"fldEXcategory_TODO",method:"fldEXmethod_TODO",vendor:"fldEXvendor_TODO",client:"fldEXclient_TODO",receipt:"fldEXreceipt_TODO",notes:"fldEXnotes_TODO"}};
 const STAGES=["New lead","Contacted","Audit sent","Meeting","Quote sent","Quote signed","Contract signed","Active","Completed","Lost"];
 const OPEN=STAGES.slice(0,6), WON=["Contract signed","Active","Completed"];
 const STAGE_CLASS={"New lead":"s-early","Contacted":"s-early","Audit sent":"s-early","Meeting":"s-mid","Quote sent":"s-mid","Quote signed":"s-late","Contract signed":"s-late","Active":"s-won","Completed":"s-done","Lost":"s-lost"};
@@ -295,15 +309,20 @@ const CH={
   cstatus:["Draft","Sent","Signed","Active","Completed","Cancelled"],
   istatus:["Draft","Sent","Paid","Overdue","Void"],
   method:["GCash","Bank transfer","Cash","Maya","PayPal","Other"],
+  ecat:["Software & subscriptions","Ads & marketing","Contractors & freelancers","Salaries & wages","Office & rent","Utilities & internet","Equipment","Transport & travel","Meals & client entertainment","Bank & payment fees","Taxes & government","Client refund","Other"],
   atype:["Call","Messenger / Chat","Email","Meeting","Audit sent","Quote sent","Contract sent","Payment","Note"]
 };
 const STATUS_CLASS={Draft:"s-early",Sent:"s-mid",Approved:"s-won",Declined:"s-lost",Signed:"s-late",Active:"s-won",Completed:"s-done",Cancelled:"s-lost",Paid:"f-ok",Overdue:"f-over",Void:"s-done"};
 
 /* ---------- state ---------- */
-const S={CL:[],QU:[],CO:[],IN:[],AC:[]};
-const loaded={CL:false,QU:false,CO:false,IN:false,AC:false};
+const S={CL:[],QU:[],CO:[],IN:[],AC:[],EX:[]};
+const loaded={CL:false,QU:false,CO:false,IN:false,AC:false,EX:false};
+const CORE=["CL","QU","CO","IN","AC"];
+let exErr=null;
+let M=null,Mfail=false;
+import("/money.js").then(m=>{M=m;if(tab==="money")render()}).catch(()=>{Mfail=true;if(tab==="money")render()});
 let me={email:(()=>{try{return localStorage.getItem("kcrm_me")||null}catch(e){return null}})(),name:""}, lastSync=null, tab="overview", openClient=null, busy=0, pageErr=null;
-const fx={leads:{q:"",stage:"",owner:"",source:""}};
+const fx={leads:{q:"",stage:"",owner:"",source:""},money:{month:"",category:""}};
 
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
@@ -328,6 +347,8 @@ function norm(tbl,r){const c=r.cellValuesByFieldId||{},f=T[tbl].f,o={id:r.id,_cr
   if(tbl==="QU"){o.status=selName(o.status);o.client=linkIds(o.client);o.total=o.total==null?null:Number(o.total)}
   if(tbl==="CO"){o.status=selName(o.status);o.client=linkIds(o.client);o.quote=linkIds(o.quote);o.value=o.value==null?null:Number(o.value)}
   if(tbl==="IN"){o.status=selName(o.status);o.method=selName(o.method);o.client=linkIds(o.client);o.contract=linkIds(o.contract);o.amount=o.amount==null?null:Number(o.amount)}
+  if(tbl==="IN")o.created=r.createdTime;
+  if(tbl==="EX"){o.category=selName(o.category);o.method=selName(o.method);o.client=linkIds(o.client);o.receipt=atts(o.receipt);o.amount=o.amount==null?null:Number(o.amount);o.description=o.desc;o.created=r.createdTime}
   if(tbl==="AC"){o.type=selName(o.type);o.client=linkIds(o.client);o.by=collab(o.by)}
   return o}
 const byId=(tbl,id)=>S[tbl].find(r=>r.id===id);
@@ -378,8 +399,12 @@ async function api(method,payload,table){
   return j}
 let loading=false;
 async function loadAll(){if(loading||!authed)return;loading=true;setSync();
-  try{const res=await Promise.all(Object.keys(T).map(t=>api("GET",null,T[t].id).then(p=>[t,p])));
+  try{const exP=api("GET",null,T.EX.id).then(p=>({p}),e=>({e}));
+    const res=await Promise.all(CORE.map(t=>api("GET",null,T[t].id).then(p=>[t,p])));
     res.forEach(([t,p])=>{S[t]=(p.records||[]).map(r=>norm(t,r));loaded[t]=true});
+    const ex=await exP;
+    if(ex.p){S.EX=(ex.p.records||[]).map(r=>norm("EX",r));exErr=null}else if(!ex.e||ex.e.code!=="login"){exErr=(ex.e&&ex.e.message)||"unknown error"}
+    loaded.EX=true;
     lastSync=Date.now();clearBanner();render()}
   catch(e){if(e.code!=="login")showBanner(e.code,e.code==="not_configured"?e.message:"Couldn't load from Airtable: "+e.message+(lastSync?". Showing what was loaded earlier.":""))}
   finally{loading=false;setSync()}}
@@ -447,6 +472,10 @@ const SPECS={
     {k:"status",l:"Status",t:"select",o:CH.istatus,noBlank:1},{k:"amount",l:"Amount (₱)",t:"number"},
     {k:"issue",l:"Issue date",t:"date"},{k:"due",l:"Due date",t:"date"},{k:"paid",l:"Paid date",t:"date"},{k:"method",l:"Payment method",t:"select",o:CH.method},
     {k:"notes",l:"Notes",t:"textarea",full:1}]},
+  expense:{tbl:"EX",title:"Expense",fields:[
+    {k:"desc",l:"Description",t:"text",req:1,full:1},{k:"date",l:"Date",t:"date",req:1},{k:"amount",l:"Amount (₱)",t:"number",req:1},
+    {k:"category",l:"Category",t:"select",o:CH.ecat,noBlank:1},{k:"method",l:"Method",t:"select",o:CH.method},
+    {k:"vendor",l:"Paid to",t:"text"},{k:"client",l:"Client (if billable)",t:"link",opts:clientOptions},{k:"notes",l:"Notes",t:"textarea",full:1}]},
   lost:{tbl:"CL",title:"Why was it lost?",fields:[{k:"lost",l:"Lost reason",t:"text",full:1}]}
 };
 SPECS.client.fields=SPECS.lead.fields.filter(x=>x.k!=="stage");
@@ -470,6 +499,7 @@ function openForm(kind,rec,ctx){
     if(kind==="activity")Object.assign(init,{date:t,type:"Call",by:me.email||"",_next:rec&&rec.next?String(rec.next).slice(0,10):"",_fnote:rec&&rec.fnote||""});
     if(kind==="quote")Object.assign(init,{no:nextNo("QU","Q"),date:t,valid:addDays(t,14),status:"Draft",client:ctx.client,by:me.name||""});
     if(kind==="contract"){const q=ctx.client&&S.QU.find(q=>q.client.includes(ctx.client)&&q.status==="Approved");Object.assign(init,{no:nextNo("CO","A"),status:"Draft",client:ctx.client,quote:q&&q.id,value:q&&q.total})}
+    if(kind==="expense")Object.assign(init,{date:t,category:CH.ecat[0]});
     if(kind==="invoice"){const c=ctx.client&&S.CO.find(c=>c.client.includes(ctx.client));Object.assign(init,{no:nextNo("IN","I"),status:"Draft",issue:t,due:addDays(t,7),client:ctx.client,contract:c&&c.id})}
   }
   if(kind==="lost")init.lost=rec.lost||"";
@@ -482,7 +512,7 @@ function openForm(kind,rec,ctx){
   const save=h("button",{class:"btn primary",type:"submit",text:editing?"Save changes":kind==="activity"?"Log it":"Create"});
   const title=kind==="activity"?`Log activity · ${rec.name||rec.cid}`:kind==="lost"?spec.title:(editing?`Edit ${spec.title.toLowerCase()}`:(kind==="lead"?"New lead":"New "+spec.title.toLowerCase()));
   const close=()=>$("#modalHost").replaceChildren();
-  const filesNote=(tbl==="QU"||tbl==="CO"||tbl==="IN")?h("span",{class:"note"},"PDFs: ",editing?h("a",{href:airtableUrl(tbl,rec.id),target:"_blank",rel:"noopener",text:"attach in Airtable"}):"attach in Airtable after creating"):h("span",{class:"note"});
+  const filesNote=(tbl==="QU"||tbl==="CO"||tbl==="IN"||tbl==="EX")?h("span",{class:"note"},tbl==="EX"?"Receipts: ":"PDFs: ",editing?h("a",{href:airtableUrl(tbl,rec.id),target:"_blank",rel:"noopener",text:"attach in Airtable"}):"attach in Airtable after creating"):h("span",{class:"note"});
   form.addEventListener("submit",async ev=>{ev.preventDefault();err.textContent="";
     const vals={};spec.fields.forEach(fd=>{vals[fd.k]=form.querySelector("#f_"+fd.k).value.trim()});
     const miss=spec.fields.find(fd=>fd.req&&!vals[fd.k]);if(miss){err.textContent=`Fill in ${miss.l}.`;return}
@@ -494,6 +524,10 @@ function openForm(kind,rec,ctx){
       else out=v===""?null:v;
       if(!editing&&(out==null||(Array.isArray(out)&&!out.length)))continue;
       fields[F[fd.k]]=out}
+    if(kind==="expense"){const c=M?M.toCentavos(vals.amount):null;if(!M){err.textContent="Still loading. Try again in a moment.";return}
+      if(c==null){err.textContent="Enter a valid amount, like 1250 or 1250.50.";return}
+      if(!vals.date||!/^\d{4}-\d{2}-\d{2}$/.test(vals.date)){err.textContent="Enter a valid date.";return}
+      fields[F.amount]=M.fromCentavos(c)}
     save.disabled=true;save.textContent="Saving…";
     try{
       if(kind==="activity"){
@@ -506,7 +540,7 @@ function openForm(kind,rec,ctx){
       else{if(kind==="lead"&&me.email&&!vals.owner)fields[T.CL.f.owner]={email:me.email};
         if(kind==="lead"&&WON.includes(vals.stage))fields[T.CL.f.won]=todayStr();
         await createRec(tbl,fields);toast(`${spec.title==="New lead"?"Lead":spec.title} created in Airtable`)
-        if(tbl!=="CL"&&vals.client){const t=kind==="quote"?"Quote sent":kind==="contract"?"Contract sent":"Note";logActivity(vals.client,`${spec.title} ${vals.no} created`,t).catch(()=>{})}}
+        if(tbl!=="CL"&&kind!=="expense"&&vals.client){const t=kind==="quote"?"Quote sent":kind==="contract"?"Contract sent":"Note";logActivity(vals.client,`${spec.title} ${vals.no} created`,t).catch(()=>{})}}
       close()}
     catch(e){save.disabled=false;save.textContent=editing?"Save changes":"Try again";err.textContent=e&&e.code==="login"?"Log in again, then save.":"Not saved: "+(e&&e.message||"")}
   });
@@ -648,6 +682,73 @@ function viewBilling(){return loadingOr(["QU","CO","IN","CL"],()=>{
     block("Contracts","contract",["No.","Client","Status","Signed","Start","End","Value","PDF"],c,r=>[h("td",{class:"mono",text:r.no||"–"}),h("td",{text:clientsFor(r.client)}),h("td",null,pill(r.status,STATUS_CLASS[r.status])),h("td",{class:"mono",text:fdate(r.signed)}),h("td",{class:"mono",text:fdate(r.start)}),h("td",{class:"mono",text:fdate(r.end)}),h("td",{class:"r mono",text:peso(r.value)}),files(r)],"No contracts yet."),
     block("Invoices","invoice",["No.","Client","Status","Issued","Due","Amount","Paid on","PDF"],i,r=>{const p=payStatus(r);return[h("td",{class:"mono",text:r.no||"–"}),h("td",{text:clientsFor(r.client)}),h("td",null,pill(p,STATUS_CLASS[p])),h("td",{class:"mono",text:fdate(r.issue)}),h("td",{class:"mono",text:fdate(r.due)}),h("td",{class:"r mono",text:peso(r.amount)}),h("td",{class:"mono",text:fdate(r.paid)}),files(r)]},"No invoices yet."))})}
 
+/* ---------- money ---------- */
+const svgI=(inner,w)=>{const s=document.createElement("span");s.style.cssText="display:inline-flex;flex:0 0 auto";s.innerHTML=`<svg viewBox="0 0 16 16" width="${w||14}" height="${w||14}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;return s};
+const G_PREV='<path d="M10 3.5 5.5 8 10 12.5"/>',G_NEXT='<path d="M6 3.5 10.5 8 6 12.5"/>',G_IN='<path d="M12 4 5 11M5 6v5h5"/><path d="M3 14h10"/>',G_OUT='<path d="M4 12 11 5M6 5h5v5"/><path d="M3 2h10"/>';
+const mShift=(mk,n)=>{const p=mk.split("-").map(Number);return new Date(Date.UTC(p[0],p[1]-1+n,1)).toISOString().slice(0,7)};
+const mLabel=(mk,short)=>new Date(mk+"-01T00:00:00Z").toLocaleDateString("en-US",short?{month:"short",timeZone:"UTC"}:{month:"long",year:"numeric",timeZone:"UTC"});
+const mSigned=c=>(c<0?"−":"+")+peso(Math.abs(c)/100);
+const mBal=c=>(c<0?"−":"")+peso(Math.abs(c)/100);
+
+function viewMoney(){
+  if(!M)return Mfail?h("div",{class:"banner bad"},h("p",{text:"The Money tab couldn't load its script. Refresh the page."})):h("div",{class:"card skel",text:"Loading from Airtable…"});
+  return loadingOr(["IN","EX"],()=>{
+    const F=fx.money,today=todayStr(),cur=today.slice(0,7);if(!F.month)F.month=cur;const mk=F.month,ml=mLabel(mk);
+    const {entries,problems}=M.buildLedger(S.IN,S.EX,{today,clientName:x=>clientsFor(Array.isArray(x)?x:[x])});
+    const mine=entries.filter(e=>e.month===mk),rows=mine.slice().reverse();
+    const prev=entries.find(e=>e.month<mk),opening=prev?prev.balance:0,closing=rows.length?rows[rows.length-1].balance:opening;
+    const tot=M.totals(mine),nIn=mine.filter(e=>e.kind==="in").length,nOut=mine.length-nIn;
+    const open=e=>{const r=byId(e.ref,e.id);if(r)openForm(e.ref==="IN"?"invoice":"expense",r)};
+    const add=(cls)=>h("button",{class:"btn small primary"+(cls||""),type:"button",text:"+ Add expense",onclick:()=>openForm("expense")});
+    const nav=h("div",{class:"monthnav"},
+      h("button",{class:"btn small ghost",type:"button","aria-label":"Previous month",onclick:()=>{F.month=mShift(mk,-1);render()}},svgI(G_PREV)),
+      h("span",{class:"mono","aria-live":"polite",text:ml}),
+      h("button",{class:"btn small ghost",type:"button","aria-label":"Next month",disabled:mk>=cur,onclick:()=>{F.month=mShift(mk,1);render()}},svgI(G_NEXT)));
+    const notices=[];
+    if(exErr)notices.push(h("div",{class:"banner bad"},h("p",{text:"Expenses couldn't load ("+exErr+"). Money in still shows; money out and the balance are incomplete until this is fixed."}),h("button",{class:"btn small",type:"button",text:"Try again",onclick:()=>loadAll()})));
+    if(problems&&problems.length){const ni=problems.filter(p=>p.ref==="IN").length,ne=problems.length-ni,bits=[];
+      if(ni)bits.push(`${ni} paid invoice${ni===1?"":"s"}`);if(ne)bits.push(`${ne} expense${ne===1?"":"s"}`);
+      notices.push(h("div",{class:"banner"},h("p",{text:`${bits.join(" and ")} need${problems.length===1?"s":""} a date or amount, so ${problems.length===1?"it is":"they are"} left out of the ledger.`}),
+        h("button",{class:"btn small",type:"button",text:"Open first",onclick:()=>{const p=problems[0],r=byId(p.ref,p.id);if(r)openForm(p.ref==="IN"?"invoice":"expense",r)}})))}
+    const k=h("div",{class:"kpis money"},
+      kpi("Money in",pesoShort(tot.in/100),`${nIn} paid invoice${nIn===1?"":"s"}`),
+      kpi("Money out",pesoShort(tot.out/100),`${nOut} expense${nOut===1?"":"s"}`),
+      kpi("Net",(tot.net<0?"−":"+")+pesoShort(Math.abs(tot.net)/100),"In minus out",tot.net<0));
+    const cats=M.byCategory(mine),maxC=Math.max(1,...cats.map(c=>c.out));
+    const bars=cats.length?h("div",{class:"funnel"},cats.map(c=>h("div",{class:"frow"},h("span",{text:c.category}),
+      h("div",{class:"ftrack"},h("div",{class:"ffill",style:`width:${Math.max(0,c.out)/maxC*100}%;background:color-mix(in srgb,var(--accent) 45%,transparent)`}),h("span",{class:"fcount",text:Math.round(c.share*100)+"%"})),
+      h("span",{class:"fval",text:peso(c.out/100)})))):h("div",{class:"empty",text:"No spending recorded for "+mLabel(mk,1)+"."});
+    const top=mine.filter(e=>e.kind==="out").sort((a,b)=>b.amount-a.amount).slice(0,5);
+    const where=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:"Where it went"})),bars);
+    const big=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:6px"},h("h2",{text:"Biggest expenses"})),
+      top.length?h("div",{class:"list"},top.map(e=>h("div",{class:"li"},h("span",{class:"t",text:e.label||"(no description)",onclick:()=>open(e)}),h("span",{class:"mono",text:peso(e.amount/100)}),h("div",{class:"m"},h("span",{text:fdate(e.date)}),pill(e.category,"s-early"))))):h("div",{class:"empty",text:"Nothing yet."}));
+    const dash=()=>h("span",{class:"muted",text:"–"});
+    const body=rows.map(e=>{const isIn=e.kind==="in";return h("tr",{onclick:()=>open(e)},
+      h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{text:e.label||"–"}),h("td",null,pill(e.category,"s-early")),
+      h("td",{class:"r mono in"},isIn?mSigned(e.signed):dash()),h("td",{class:"r mono out"},isIn?dash():mSigned(e.signed)),
+      h("td",{class:"r mono bal"+(e.balance<0?" neg":"")},mBal(e.balance)))});
+    const openRow=h("tr",{class:"opening"},h("td",{colspan:"5",text:"Carried from "+mLabel(mShift(mk,-1),1)}),h("td",{class:"r mono",text:mBal(opening)}));
+    const showTable=rows.length||opening!==0;
+    const table=h("table",{class:"ledger"},
+      h("thead",null,h("tr",null,["Date","Description","Category","In","Out","Balance"].map((t,i)=>h("th",{class:i>=3?"r mono":null,text:t})))),
+      h("tbody",null,openRow,body),
+      rows.length?h("tfoot",null,h("tr",null,h("td",{text:"Month total"}),h("td"),h("td"),h("td",{class:"r mono",text:"+"+peso(tot.in/100)}),h("td",{class:"r mono",text:"−"+peso(tot.out/100)}),h("td",{class:"r mono"+(closing<0?" neg":""),text:mBal(closing)}))):null);
+    const li=(title,right,meta,cls,click)=>h("div",{class:"li"+(cls?" "+cls:"")},h("span",{class:"t",text:title,onclick:click}),right,h("div",{class:"m"},meta));
+    const list=h("div",{class:"card list ledger-list"},
+      li("Carried from "+mLabel(mShift(mk,-1),1),h("span",{class:"mono muted",text:mBal(opening)}),null,"muted"),
+      rows.map(e=>{const isIn=e.kind==="in";return li(e.label||"–",
+        h("span",{class:"mono",style:"display:inline-flex;align-items:center;gap:5px"+(isIn?";color:var(--ok)":""),"aria-label":isIn?"Money in":"Money out"},svgI(isIn?G_IN:G_OUT),mSigned(e.signed)),
+        [h("span",{text:fdate(e.date)}),pill(e.category,"s-early"),h("span",{class:e.balance<0?"":"muted",style:e.balance<0?"color:var(--hot)":null,text:"Bal "+mBal(e.balance)})],null,()=>open(e))}),
+      rows.length?li("Closing balance",h("span",{class:"mono muted",text:mBal(closing)}),null,"muted"):null);
+    const empty=h("div",{class:"card empty"},h("p",{style:"margin:0 0 10px",text:`Nothing in or out for ${ml}. Add an expense, or mark an invoice Paid in Quotes & billing and it shows up here.`}),add());
+    return h("div",{style:"display:flex;flex-direction:column;gap:16px"},
+      h("div",{class:"section-head"},h("h2",{text:"Money"}),nav,add()),
+      notices,k,
+      h("div",{class:"grid2"},where,big),
+      h("div",{class:"section-head"},h("h2",{text:"Ledger"}),h("span",{class:"mono muted",text:`${rows.length} row${rows.length===1?"":"s"}`})),
+      showTable?[h("div",{class:"tablewrap"},table),list]:null,
+      rows.length?null:empty)})}
+
 /* ---------- client panel ---------- */
 function showClient(id){openClient=id;renderDrawer()}
 function closeClient(){openClient=null;$("#drawerHost").replaceChildren()}
@@ -682,7 +783,7 @@ function renderDrawer(){const host=$("#drawerHost");if(!openClient){host.replace
   const body=drawer.querySelector(".dbody");if(body)body.scrollTop=keepScroll}
 
 /* ---------- routing & render ---------- */
-const VIEWS={overview:viewOverview,pipeline:viewPipeline,leads:viewLeads,followups:viewFollowups,won:viewWon,billing:viewBilling};
+const VIEWS={overview:viewOverview,pipeline:viewPipeline,leads:viewLeads,followups:viewFollowups,won:viewWon,billing:viewBilling,money:viewMoney};
 function go(t){if(!VIEWS[t])t="overview";tab=t;try{history.replaceState(null,"","#"+t)}catch(e){}try{localStorage.setItem("kcrm_tab",t)}catch(e){}render();window.scrollTo(0,0)}
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===tab)));
