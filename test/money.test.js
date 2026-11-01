@@ -257,7 +257,7 @@ describe("buildLedger: ordering and running balance", () => {
   test("balance is cumulative in ascending order regardless of input order", () => {
     const i = [inv({ id: "i2", paid: "2026-02-01", amount: 500 }), inv({ id: "i1", paid: "2026-01-01", amount: 1000 })];
     const e = [ex({ id: "e1", date: "2026-01-15", amount: 300 })];
-    const r = build(i, e, { opening: 200 });
+    const r = build(i, e, { opening: 20000 }); // opening is centavos (spec)
     // ascending: i1 +1000 -> 1200 ; e1 -300 -> 900 ; i2 +500 -> 1400 (centavos x100)
     assert.deepEqual(r.entries.map(x => [x.id, x.balance]),
       [["i2", 140000], ["e1", 90000], ["i1", 120000]]);
