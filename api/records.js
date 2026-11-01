@@ -1,4 +1,5 @@
 import { isAuthed } from "../lib/auth.js";
+import { validateExpenseFields } from "../public/money.js";
 
 // Only these Khybrio Records tables can be read or written through the site.
 const BASE = process.env.AIRTABLE_BASE_ID || "app6fRankhuL6LyjF";
@@ -8,7 +9,16 @@ const TABLES = new Set([
   "tbls4JGf4EmpTNZIA", // Contracts
   "tblS66t7fb8lBerx3", // Invoices
   "tblhhCSBErRCDmpgE", // Activity Log
+  "tbljG1uprTR1n85UR", // Expenses
 ]);
+const EXPENSES = "tbljG1uprTR1n85UR";
+// Key -> field id for Expenses. Keep in sync with T.EX.f in index.html.
+const FID = {
+  desc: "fldexOv0PbHazjQXx",
+  date: "fldUhOSnJaaaG3HcA",
+  amount: "fldpsZmX1nqQLI9vc",
+  category: "fldzY4XPkNJ1H077o",
+};
 const API = process.env.AIRTABLE_API_URL || "https://api.airtable.com/v0";
 
 async function airtable(path, init = {}) {
@@ -61,6 +71,12 @@ export default async function handler(req, res) {
       const clean = recs.map((r) =>
         req.method === "PATCH" ? { id: String(r.id || ""), fields: r.fields || {} } : { fields: r.fields || {} }
       );
+      if (table === EXPENSES) {
+        for (const r of clean) {
+          const errs = validateExpenseFields(r.fields, FID, { create: req.method === "POST" });
+          if (errs.length) return res.status(400).json({ error: "bad_fields", message: errs.join("; ") });
+        }
+      }
       if (req.method === "PATCH" && clean.some((r) => !/^rec[A-Za-z0-9]{14}$/.test(r.id))) {
         return res.status(400).json({ error: "bad_record_id" });
       }

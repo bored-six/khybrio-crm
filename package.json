@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Khybrio CRM dashboard on top of the Khybrio Records Airtable base",
+  "scripts": {
+    "test": "node --test"
+  },
   "engines": {
     "node": ">=18"
   }
