@@ -242,6 +242,17 @@ a{color:var(--accent)}
 html{padding-top:env(safe-area-inset-top,0px)}
 
 /* money */
+.modes{display:inline-flex;background:rgba(245,247,246,.1);border-radius:999px;padding:3px;gap:2px}
+.modes button{border:0;background:none;color:var(--band-muted);padding:5px 14px;border-radius:999px;cursor:pointer;font-weight:600;font-size:13px}
+.modes button[aria-pressed="true"]{background:var(--band-fg);color:var(--teal-deep)}
+.modes button:not([aria-pressed="true"]):hover{color:var(--band-fg)}
+.trow{cursor:pointer}.trow.sel span:first-child{font-weight:700}
+.tpair{display:flex;flex-direction:column;gap:3px}
+.tbar{height:9px;border-radius:99px;min-width:2px}
+.tbar.in{background:var(--ok)}.tbar.out{background:color-mix(in srgb,var(--hot) 70%,transparent)}
+.fval.neg{color:var(--hot)}
+.trendkey{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.trendkey .k{width:10px;height:10px;border-radius:50%}.trendkey .k.in{background:var(--ok)}.trendkey .k.out{background:var(--hot)}.trendkey .k.out{margin-left:6px}
 .monthnav{display:flex;align-items:center;gap:2px}
 .monthnav .mono{min-width:112px;text-align:center;font-weight:600}
 .kpis.money .val{white-space:nowrap}
@@ -250,7 +261,7 @@ table.ledger td.bal{font-weight:600}
 table.ledger td.bal.neg{color:var(--hot)}
 table.ledger tr.opening td{background:var(--sunk);color:var(--muted);font-style:italic;cursor:default}
 .ledger-list{display:none}
-@media (max-width:560px){table.ledger,.tablewrap:has(table.ledger){display:none}.ledger-list{display:flex}.kpis.money{grid-template-columns:1fr 1fr}.kpis.money .kpi:last-child{grid-column:1/-1}.monthnav{order:3;width:100%;justify-content:space-between}.monthnav .btn.small{min-height:44px}}
+@media (max-width:560px){table.ledger,.tablewrap:has(table.ledger){display:none}.ledger-list{display:flex}.kpis.money{grid-template-columns:1fr 1fr}.monthnav{order:3;width:100%;justify-content:space-between}.monthnav .btn.small{min-height:44px}}
 </style>
 </head>
 <body>
@@ -258,7 +269,11 @@ table.ledger tr.opening td{background:var(--sunk);color:var(--muted);font-style:
 <header class="top">
   <div class="wrap">
     <div class="bar">
-      <div class="brand"><img class="logo" src="/brand/khybrio-glyph.png" alt=""><h1>Khybrio <span>CRM</span></h1><span class="tag">Clients &amp; pipeline</span></div>
+      <div class="brand"><img class="logo" src="/brand/khybrio-glyph.png" alt=""><h1>Khybrio <span>CRM</span></h1><span class="tag" id="tagline">Clients &amp; pipeline</span></div>
+      <div class="modes" id="modes" role="group" aria-label="Workspace">
+        <button type="button" data-mode="crm" aria-pressed="true">CRM</button>
+        <button type="button" data-mode="money" aria-pressed="false">Money</button>
+      </div>
       <div class="sync" id="sync"><span class="dot" id="syncDot"></span><span id="syncText">Connecting to Airtable…</span></div>
       <button class="btn small" id="refreshBtn" type="button">Refresh</button>
       <button class="btn small ghost" id="logoutBtn" type="button" hidden>Log out</button>
@@ -271,7 +286,10 @@ table.ledger tr.opening td{background:var(--sunk);color:var(--muted);font-style:
       <button type="button" role="tab" data-tab="followups">Follow-ups <span class="badge" id="bFu">0</span></button>
       <button type="button" role="tab" data-tab="won">Deals won</button>
       <button type="button" role="tab" data-tab="billing">Quotes &amp; billing</button>
-      <button type="button" role="tab" data-tab="money">Money</button>
+    </nav>
+    <nav class="tabs" id="moneyTabs" role="tablist" hidden>
+      <button type="button" role="tab" data-tab="money-overview" aria-selected="false">Overview</button>
+      <button type="button" role="tab" data-tab="money-ledger" aria-selected="false">Ledger</button>
     </nav>
   </div>
 </header>
@@ -319,7 +337,7 @@ const loaded={CL:false,QU:false,CO:false,IN:false,AC:false,EX:false};
 const CORE=["CL","QU","CO","IN","AC"];
 let exErr=null;
 let M=null,Mfail=false;
-import("/money.js").then(m=>{M=m;if(tab==="money")render()}).catch(()=>{Mfail=true;if(tab==="money")render()});
+import("/money.js").then(m=>{M=m;if(tab.startsWith("money"))render()}).catch(()=>{Mfail=true;if(tab.startsWith("money"))render()});
 let me={email:(()=>{try{return localStorage.getItem("kcrm_me")||null}catch(e){return null}})(),name:""}, lastSync=null, tab="overview", openClient=null, busy=0, pageErr=null;
 const fx={leads:{q:"",stage:"",owner:"",source:""},money:{month:"",category:""}};
 
@@ -698,7 +716,7 @@ const mLabel=(mk,short)=>new Date(mk+"-01T00:00:00Z").toLocaleDateString("en-US"
 const mSigned=c=>(c<0?"−":"+")+peso(Math.abs(c)/100);
 const mBal=c=>(c<0?"−":"")+peso(Math.abs(c)/100);
 
-function viewMoney(){
+function viewMoney(part){
   if(!M)return Mfail?h("div",{class:"banner bad"},h("p",{text:"The Money tab couldn't load its script. Refresh the page."})):h("div",{class:"card skel",text:"Loading from Airtable…"});
   return loadingOr(["IN","EX"],()=>{
     const F=fx.money,today=todayStr(),cur=today.slice(0,7);if(!F.month)F.month=cur;const mk=F.month,ml=mLabel(mk);
@@ -718,7 +736,36 @@ function viewMoney(){
       if(ni)bits.push(`${ni} paid invoice${ni===1?"":"s"}`);if(ne)bits.push(`${ne} expense${ne===1?"":"s"}`);
       notices.push(h("div",{class:"banner"},h("p",{text:`${bits.join(" and ")} need${problems.length===1?"s":""} a date or amount, so ${problems.length===1?"it is":"they are"} left out of the ledger.`}),
         h("button",{class:"btn small",type:"button",text:"Open first",onclick:()=>{const p=problems[0],r=byId(p.ref,p.id);if(r)openForm(p.ref==="IN"?"invoice":"expense",r)}})))}
+    const wrapV=(...kids)=>h("div",{style:"display:flex;flex-direction:column;gap:16px"},...kids);
+
+    if(part==="ledger"){
+      const dash=()=>h("span",{class:"muted",text:"–"});
+      const body=rows.map(e=>{const isIn=e.kind==="in";return h("tr",{onclick:()=>open(e)},
+        h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{text:e.label||"–"}),h("td",null,pill(e.category,"s-early")),
+        h("td",{class:"r mono in"},isIn?mSigned(e.signed):dash()),h("td",{class:"r mono out"},isIn?dash():mSigned(e.signed)),
+        h("td",{class:"r mono bal"+(e.balance<0?" neg":"")},mBal(e.balance)))});
+      const openRow=h("tr",{class:"opening"},h("td",{colspan:"5",text:"Carried from "+mLabel(mShift(mk,-1),1)}),h("td",{class:"r mono",text:mBal(opening)}));
+      const showTable=rows.length||opening!==0;
+      const table=h("table",{class:"ledger"},
+        h("thead",null,h("tr",null,["Date","Description","Category","In","Out","Balance"].map((t,i)=>h("th",{class:i>=3?"r mono":null,text:t})))),
+        h("tbody",null,openRow,body),
+        rows.length?h("tfoot",null,h("tr",null,h("td",{text:"Month total"}),h("td"),h("td"),h("td",{class:"r mono",text:"+"+peso(tot.in/100)}),h("td",{class:"r mono",text:"−"+peso(tot.out/100)}),h("td",{class:"r mono"+(closing<0?" neg":""),text:mBal(closing)}))):null);
+      const li=(title,right,meta,cls,click)=>h("div",{class:"li"+(cls?" "+cls:"")},h("span",{class:"t",text:title,onclick:click}),right,h("div",{class:"m"},meta));
+      const list=h("div",{class:"card list ledger-list"},
+        li("Carried from "+mLabel(mShift(mk,-1),1),h("span",{class:"mono muted",text:mBal(opening)}),null,"muted"),
+        rows.map(e=>{const isIn=e.kind==="in";return li(e.label||"–",
+          h("span",{class:"mono",style:"display:inline-flex;align-items:center;gap:5px"+(isIn?";color:var(--ok)":""),"aria-label":isIn?"Money in":"Money out"},svgI(isIn?G_IN:G_OUT),mSigned(e.signed)),
+          [h("span",{text:fdate(e.date)}),pill(e.category,"s-early"),h("span",{class:e.balance<0?"":"muted",style:e.balance<0?"color:var(--hot)":null,text:"Bal "+mBal(e.balance)})],null,()=>open(e))}),
+        rows.length?li("Closing balance",h("span",{class:"mono muted",text:mBal(closing)}),null,"muted"):null);
+      const empty=h("div",{class:"card empty"},h("p",{style:"margin:0 0 10px",text:`Nothing in or out for ${ml}. Add an expense, or mark an invoice Paid in Quotes & billing and it shows up here.`}),add());
+      return wrapV(
+        h("div",{class:"section-head"},h("h2",{text:"Ledger"}),nav,add()),
+        notices,
+        showTable?[h("div",{class:"tablewrap"},table),list]:null,
+        rows.length?null:empty)}
+
     const k=h("div",{class:"kpis money"},
+      kpi("Balance today",mBal(M.balanceAsOf(entries,today)),"All time, to date",M.balanceAsOf(entries,today)<0),
       kpi("Money in",pesoShort(tot.in/100),`${nIn} paid invoice${nIn===1?"":"s"}`),
       kpi("Money out",pesoShort(tot.out/100),`${nOut} expense${nOut===1?"":"s"}`),
       kpi("Net",(tot.net<0?"−":"+")+pesoShort(Math.abs(tot.net)/100),"In minus out",tot.net<0));
@@ -730,32 +777,19 @@ function viewMoney(){
     const where=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:"Where it went"})),bars);
     const big=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:6px"},h("h2",{text:"Biggest expenses"})),
       top.length?h("div",{class:"list"},top.map(e=>h("div",{class:"li"},h("span",{class:"t",text:e.label||"(no description)",onclick:()=>open(e)}),h("span",{class:"mono",text:peso(e.amount/100)}),h("div",{class:"m"},h("span",{text:fdate(e.date)}),pill(e.category,"s-early"))))):h("div",{class:"empty",text:"Nothing yet."}));
-    const dash=()=>h("span",{class:"muted",text:"–"});
-    const body=rows.map(e=>{const isIn=e.kind==="in";return h("tr",{onclick:()=>open(e)},
-      h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{text:e.label||"–"}),h("td",null,pill(e.category,"s-early")),
-      h("td",{class:"r mono in"},isIn?mSigned(e.signed):dash()),h("td",{class:"r mono out"},isIn?dash():mSigned(e.signed)),
-      h("td",{class:"r mono bal"+(e.balance<0?" neg":"")},mBal(e.balance)))});
-    const openRow=h("tr",{class:"opening"},h("td",{colspan:"5",text:"Carried from "+mLabel(mShift(mk,-1),1)}),h("td",{class:"r mono",text:mBal(opening)}));
-    const showTable=rows.length||opening!==0;
-    const table=h("table",{class:"ledger"},
-      h("thead",null,h("tr",null,["Date","Description","Category","In","Out","Balance"].map((t,i)=>h("th",{class:i>=3?"r mono":null,text:t})))),
-      h("tbody",null,openRow,body),
-      rows.length?h("tfoot",null,h("tr",null,h("td",{text:"Month total"}),h("td"),h("td"),h("td",{class:"r mono",text:"+"+peso(tot.in/100)}),h("td",{class:"r mono",text:"−"+peso(tot.out/100)}),h("td",{class:"r mono"+(closing<0?" neg":""),text:mBal(closing)}))):null);
-    const li=(title,right,meta,cls,click)=>h("div",{class:"li"+(cls?" "+cls:"")},h("span",{class:"t",text:title,onclick:click}),right,h("div",{class:"m"},meta));
-    const list=h("div",{class:"card list ledger-list"},
-      li("Carried from "+mLabel(mShift(mk,-1),1),h("span",{class:"mono muted",text:mBal(opening)}),null,"muted"),
-      rows.map(e=>{const isIn=e.kind==="in";return li(e.label||"–",
-        h("span",{class:"mono",style:"display:inline-flex;align-items:center;gap:5px"+(isIn?";color:var(--ok)":""),"aria-label":isIn?"Money in":"Money out"},svgI(isIn?G_IN:G_OUT),mSigned(e.signed)),
-        [h("span",{text:fdate(e.date)}),pill(e.category,"s-early"),h("span",{class:e.balance<0?"":"muted",style:e.balance<0?"color:var(--hot)":null,text:"Bal "+mBal(e.balance)})],null,()=>open(e))}),
-      rows.length?li("Closing balance",h("span",{class:"mono muted",text:mBal(closing)}),null,"muted"):null);
-    const empty=h("div",{class:"card empty"},h("p",{style:"margin:0 0 10px",text:`Nothing in or out for ${ml}. Add an expense, or mark an invoice Paid in Quotes & billing and it shows up here.`}),add());
-    return h("div",{style:"display:flex;flex-direction:column;gap:16px"},
-      h("div",{class:"section-head"},h("h2",{text:"Money"}),nav,add()),
+    const bm=new Map(M.byMonth(entries).map(b=>[b.month,b])),span=[];for(let i=5;i>=0;i--)span.push(mShift(cur,-i));
+    const maxM=Math.max(1,...span.map(m=>{const b=bm.get(m);return b?Math.max(b.in,b.out):0}));
+    const trend=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:"Last 6 months"}),
+        h("span",{class:"trendkey"},h("span",{class:"k in"}),"In",h("span",{class:"k out"}),"Out")),
+      h("div",{class:"funnel"},span.map(m=>{const b=bm.get(m)||{in:0,out:0,net:0};
+        return h("div",{class:"frow trow"+(m===mk?" sel":""),onclick:()=>{F.month=m;render()}},h("span",{text:mLabel(m,1)+" "+m.slice(2,4)}),
+          h("div",{class:"tpair"},h("div",{class:"tbar in",style:`width:${b.in/maxM*100}%`}),h("div",{class:"tbar out",style:`width:${b.out/maxM*100}%`})),
+          h("span",{class:"fval"+(b.net<0?" neg":""),text:(b.net<0?"−":"+")+pesoShort(Math.abs(b.net)/100)}))})));
+    return wrapV(
+      h("div",{class:"section-head"},h("h2",{text:"Money overview"}),nav,add()),
       notices,k,
       h("div",{class:"grid2"},where,big),
-      h("div",{class:"section-head"},h("h2",{text:"Ledger"}),h("span",{class:"mono muted",text:`${rows.length} row${rows.length===1?"":"s"}`})),
-      showTable?[h("div",{class:"tablewrap"},table),list]:null,
-      rows.length?null:empty)})}
+      trend)})}
 
 /* ---------- client panel ---------- */
 function showClient(id){openClient=id;renderDrawer()}
@@ -791,23 +825,33 @@ function renderDrawer(){const host=$("#drawerHost");if(!openClient){host.replace
   const body=drawer.querySelector(".dbody");if(body)body.scrollTop=keepScroll}
 
 /* ---------- routing & render ---------- */
-const VIEWS={overview:viewOverview,pipeline:viewPipeline,leads:viewLeads,followups:viewFollowups,won:viewWon,billing:viewBilling,money:viewMoney};
-function go(t){if(!VIEWS[t])t="overview";tab=t;try{history.replaceState(null,"","#"+t)}catch(e){}try{localStorage.setItem("kcrm_tab",t)}catch(e){}render();window.scrollTo(0,0)}
+const VIEWS={overview:viewOverview,pipeline:viewPipeline,leads:viewLeads,followups:viewFollowups,won:viewWon,billing:viewBilling,"money-overview":()=>viewMoney("overview"),"money-ledger":()=>viewMoney("ledger")};
+const isMoney=t=>t.startsWith("money");
+function go(t){if(t==="money")t="money-overview";if(!VIEWS[t])t="overview";tab=t;try{history.replaceState(null,"","#"+t)}catch(e){}try{localStorage.setItem("kcrm_tab",t)}catch(e){}render();window.scrollTo(0,0)}
 function render(){
-  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===tab)));
+  const mm=isMoney(tab);
+  $("#tabs").hidden=mm;$("#moneyTabs").hidden=!mm;$("#newLeadBtn").hidden=mm;
+  $("#tagline").textContent=mm?"Cash in & out":"Clients & pipeline";
+  document.querySelectorAll("#modes button").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.mode==="money")===mm)));
+  document.querySelectorAll("#tabs button, #moneyTabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===tab)));
   $("#bLeads").textContent=String(openClients().length);
   const due=dueList().length,bf=$("#bFu");bf.textContent=String(due);bf.className="badge"+(due?" hot":"");
   if(document.activeElement&&document.activeElement.id==="leadSearch"&&tab==="leads"){}
   $("#view").replaceChildren(VIEWS[tab]());
   if(openClient)renderDrawer()}
-$("#tabs").addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b)go(b.dataset.tab)});
+const onTab=e=>{const b=e.target.closest("button[data-tab]");if(b)go(b.dataset.tab)};
+$("#tabs").addEventListener("click",onTab);$("#moneyTabs").addEventListener("click",onTab);
+let lastCrm="overview",lastMoney="money-overview";
+$("#modes").addEventListener("click",e=>{const b=e.target.closest("button[data-mode]");if(!b)return;
+  if(isMoney(tab))lastMoney=tab;else lastCrm=tab;
+  go(b.dataset.mode==="money"?lastMoney:lastCrm)});
 $("#newLeadBtn").addEventListener("click",()=>openForm("lead"));
 $("#refreshBtn").addEventListener("click",()=>{if(!authed)return showLogin();loadAll();toast("Refreshing from Airtable…")});
 $("#logoutBtn").addEventListener("click",async()=>{try{await fetch("/api/logout",{method:"POST"})}catch(e){}for(const k in S){S[k]=[];loaded[k]=false}lastSync=null;closeClient();render();showLogin()});
 
-let start=(location.hash||"").slice(1);if(!VIEWS[start]){try{start=localStorage.getItem("kcrm_tab")||"overview"}catch(e){start="overview"}}
+let start=(location.hash||"").slice(1);if(start==="money")start="money-overview";if(!VIEWS[start]){try{start=localStorage.getItem("kcrm_tab")||"overview";if(start==="money")start="money-overview"}catch(e){start="overview"}}
 tab=VIEWS[start]?start:"overview";render();setSync();
-window.addEventListener("hashchange",()=>{const t=location.hash.slice(1);if(VIEWS[t]&&t!==tab)go(t)});
+window.addEventListener("hashchange",()=>{const t=location.hash.slice(1);if((VIEWS[t]||t==="money")&&t!==tab)go(t)});
 setInterval(()=>{if(authed&&!document.hidden&&!busy)loadAll()},30000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&authed)loadAll()});
 (async()=>{try{const r=await fetch("/api/login");const j=await r.json();if(j.loggedIn){authed=true;$("#logoutBtn").hidden=false;loadAll()}else showLogin()}catch(e){showLogin("Couldn't reach the server.")}})();
