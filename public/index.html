@@ -246,7 +246,10 @@ html{padding-top:env(safe-area-inset-top,0px)}
 .modes button{border:0;background:none;color:var(--band-muted);padding:5px 14px;border-radius:999px;cursor:pointer;font-weight:600;font-size:13px}
 .modes button[aria-pressed="true"]{background:var(--band-fg);color:var(--teal-deep)}
 .modes button:not([aria-pressed="true"]):hover{color:var(--band-fg)}
-.addrow{display:flex;gap:6px;flex-wrap:wrap}
+.seg{display:flex;background:var(--sunk);border-radius:999px;padding:3px;gap:2px;grid-column:1/-1}
+.seg button{flex:1;border:0;background:none;padding:8px 12px;border-radius:999px;cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(15,43,41,.15)}
+.seg button[data-k="income"][aria-pressed="true"]{color:var(--ok)}.seg button[data-k="expense"][aria-pressed="true"]{color:var(--hot)}
 .trow{cursor:pointer}.trow.sel span:first-child{font-weight:700}
 .tpair{display:flex;flex-direction:column;gap:3px}
 .tbar{height:9px;border-radius:99px;min-width:2px}
@@ -528,6 +531,7 @@ function fieldInput(fd,val,ctx){const id="f_"+fd.k;let el;
   if(val!=null&&val!=="")el.value=fd.t==="date"?String(val).slice(0,10):String(val);
   return h("div",{class:"fld"+(fd.full||fd.t==="textarea"?" full":"")},h("label",{for:id,text:fd.l+(fd.req?" *":"")}),el)}
 
+let lastMoneyKind="expense";
 function openForm(kind,rec,ctx){
   const spec=SPECS[kind],editing=!!rec&&kind!=="activity",tbl=spec.tbl;ctx=ctx||{};
   const init={};
@@ -539,17 +543,23 @@ function openForm(kind,rec,ctx){
     if(kind==="contract"){const q=ctx.client&&S.QU.find(q=>q.client.includes(ctx.client)&&q.status==="Approved");Object.assign(init,{no:nextNo("CO","A"),status:"Draft",client:ctx.client,quote:q&&q.id,value:q&&q.total})}
     if(kind==="expense")Object.assign(init,{date:t,category:CH.ecat[0]});
     if(kind==="income")Object.assign(init,{date:t,source:CH.isrc[0]});
+    if(ctx.carry)Object.assign(init,ctx.carry);
     if(kind==="invoice"){const c=ctx.client&&S.CO.find(c=>c.client.includes(ctx.client));Object.assign(init,{no:nextNo("IN","I"),status:"Draft",issue:t,due:addDays(t,7),client:ctx.client,contract:c&&c.id})}
   }
   if(kind==="lost")init.lost=rec.lost||"";
   const form=h("form",{novalidate:true});
+  const pick=!editing&&(kind==="income"||kind==="expense");
+  if(pick){lastMoneyKind=kind;
+    const swap=k=>{if(k===kind)return;const carry={};["desc","date","amount","method","notes"].forEach(x=>{const el=form.querySelector("#f_"+x);if(el&&el.value)carry[x]=el.value});openForm(k,null,{...ctx,carry})};
+    form.append(h("div",{class:"seg",role:"group","aria-label":"Kind of money"},
+      [["income","Money in"],["expense","Money out"]].map(([k,l])=>h("button",{type:"button","data-k":k,"aria-pressed":String(k===kind),text:l,onclick:()=>swap(k)}))))}
   spec.fields.forEach(fd=>form.append(fieldInput(fd,init[fd.k],ctx)));
   const err=h("div",{class:"formerr",role:"alert"});form.append(err);
   const dl=h("datalist",{id:"ownerList"},owners().map(o=>h("option",{value:o.email,text:o.name})),me.email?h("option",{value:me.email}):null);
   if(kind==="lead"){const nm=form.querySelector("#f_name"),ci=form.querySelector("#f_cid");ci.value=nextClientId("");let touched=false;ci.addEventListener("input",()=>touched=true);nm.addEventListener("input",()=>{if(!touched)ci.value=nextClientId(nm.value)})}
   if(kind==="contract"||kind==="invoice"){const cs=form.querySelector("#f_client");cs.addEventListener("change",()=>{const k=kind==="contract"?"quote":"contract",fd=spec.fields.find(x=>x.k===k),old=form.querySelector("#f_"+k).closest(".fld");old.replaceWith(fieldInput(fd,"",{client:cs.value}))})}
   const save=h("button",{class:"btn primary",type:"submit",text:editing?"Save changes":kind==="activity"?"Log it":"Create"});
-  const title=kind==="activity"?`Log activity · ${rec.name||rec.cid}`:kind==="lost"?spec.title:(editing?`Edit ${spec.title.toLowerCase()}`:(kind==="lead"?"New lead":"New "+spec.title.toLowerCase()));
+  const title=kind==="activity"?`Log activity · ${rec.name||rec.cid}`:kind==="lost"?spec.title:(editing?`Edit ${spec.title.toLowerCase()}`:(kind==="lead"?"New lead":pick?"Add money":"New "+spec.title.toLowerCase()));
   const close=()=>$("#modalHost").replaceChildren();
   const filesNote=(tbl==="QU"||tbl==="CO"||tbl==="IN"||tbl==="EX")?h("span",{class:"note"},tbl==="EX"?"Receipts: ":"PDFs: ",editing?h("a",{href:airtableUrl(tbl,rec.id),target:"_blank",rel:"noopener",text:"attach in Airtable"}):"attach in Airtable after creating"):h("span",{class:"note"});
   form.addEventListener("submit",async ev=>{ev.preventDefault();err.textContent="";
@@ -739,7 +749,7 @@ function viewMoney(part){
     const tot=M.totals(mine),nIn=mine.filter(e=>e.kind==="in").length,nOut=mine.length-nIn;
     const kindOf=ref=>ref==="IN"?"invoice":ref==="IC"?"income":"expense";
     const open=e=>{const r=byId(e.ref,e.id);if(r)openForm(kindOf(e.ref),r)};
-    const add=()=>h("div",{class:"addrow"},h("button",{class:"btn small primary",type:"button",text:"+ Add income",onclick:()=>openForm("income")}),h("button",{class:"btn small",type:"button",text:"+ Add expense",onclick:()=>openForm("expense")}));
+    const add=()=>h("button",{class:"btn small primary",type:"button",text:"+ Add money",onclick:()=>openForm(lastMoneyKind)});
     const nav=h("div",{class:"monthnav"},
       h("button",{class:"btn small ghost",type:"button","aria-label":"Previous month",onclick:()=>{F.month=mShift(mk,-1);render()}},svgI(G_PREV)),
       h("span",{class:"mono","aria-live":"polite",text:ml}),
