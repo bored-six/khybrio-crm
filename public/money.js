@@ -176,6 +176,6 @@ export function validateExpenseFields(fields, fid, { create = false } = {}) {
   if (has("desc") && (typeof v("desc") !== "string" || !v("desc").trim())) errs.push("desc must be non-empty text");
   if (has("amount") && toCentavos(v("amount")) === null) errs.push("amount is not a valid peso amount");
   if (has("date") && !realDate(v("date"))) errs.push("date must be a real YYYY-MM-DD date");
-  if (has("category") && !EXPENSE_CATEGORIES.includes(v("category"))) errs.push("category is not an allowed option");
+  if (has("category") && v("category") !== null && !EXPENSE_CATEGORIES.includes(v("category"))) errs.push("category is not an allowed option");
   return errs;
 }

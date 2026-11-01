@@ -9,15 +9,15 @@ const TABLES = new Set([
   "tbls4JGf4EmpTNZIA", // Contracts
   "tblS66t7fb8lBerx3", // Invoices
   "tblhhCSBErRCDmpgE", // Activity Log
-  "tblEXPENSES_TODO", // Expenses
+  "tbljG1uprTR1n85UR", // Expenses
 ]);
-const EXPENSES = "tblEXPENSES_TODO";
-// Key -> field id for Expenses. Placeholders until the table exists; keep in sync with T.EX.f in index.html.
+const EXPENSES = "tbljG1uprTR1n85UR";
+// Key -> field id for Expenses. Keep in sync with T.EX.f in index.html.
 const FID = {
-  desc: "fldEXPENSES_desc_TODO",
-  date: "fldEXPENSES_date_TODO",
-  amount: "fldEXPENSES_amount_TODO",
-  category: "fldEXPENSES_category_TODO",
+  desc: "fldexOv0PbHazjQXx",
+  date: "fldUhOSnJaaaG3HcA",
+  amount: "fldpsZmX1nqQLI9vc",
+  category: "fldzY4XPkNJ1H077o",
 };
 const API = process.env.AIRTABLE_API_URL || "https://api.airtable.com/v0";
 

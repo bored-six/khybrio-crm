@@ -526,6 +526,11 @@ describe("validateExpenseFields", () => {
   const good = { fldDesc: "Figma", fldDate: "2026-06-01", fldAmt: 12.5, fldCat: "Software & subscriptions" };
   const v = (f, create = false) => validateExpenseFields(f, fid, { create });
 
+  test("null category clears the select and is allowed; bad text is not", () => {
+    assert.deepEqual(v({ fldCat: null }), []);
+    assert.equal(v({ fldCat: "Snacks" }).length, 1);
+  });
+
   test("valid create and valid patch", () => {
     assert.deepEqual(v(good, true), []);
     assert.deepEqual(v({ fldAmt: 5 }), []);
