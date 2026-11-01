@@ -16,6 +16,7 @@ import {
   balanceAsOf,
   filterEntries,
   validateExpenseFields,
+  validateIncomeFields,
 } from "../public/money.js";
 
 const TODAY = "2026-06-15";
@@ -570,5 +571,93 @@ describe("validateExpenseFields", () => {
 
   test("multiple problems yield multiple errors", () => {
     assert.ok(v({ fldAmt: "x", fldDate: "nope", fldCat: "nope" }).length >= 3);
+  });
+});
+
+// ---- manual income (Money Tracker) ----
+const inc = (o = {}) => ({
+  id: "recC1", created: "2026-01-01T00:00:00.000Z", desc: "Retainer May",
+  date: "2026-06-02", amount: 5000, source: "Retainer", ...o,
+});
+
+describe("buildLedger: manual income", () => {
+  test("income becomes a money-in row tagged ref IC, in centavos", () => {
+    const { entries, problems } = build([], [], { income: [inc({ amount: 1234.56 })] });
+    assert.equal(problems.length, 0);
+    assert.equal(entries.length, 1);
+    const e = entries[0];
+    assert.equal(e.kind, "in");
+    assert.equal(e.ref, "IC");
+    assert.equal(e.amount, 123456);
+    assert.equal(e.signed, 123456);
+    assert.equal(e.category, "Retainer");
+    assert.equal(e.label, "Retainer May");
+    assert.equal(e.month, "2026-06");
+  });
+
+  test("missing source falls back to Other income", () => {
+    const { entries } = build([], [], { income: [inc({ source: undefined })] });
+    assert.equal(entries[0].category, "Other income");
+  });
+
+  test("paid invoices, income and expenses share one running balance", () => {
+    const { entries } = build(
+      [inv({ amount: 1000, paid: "2026-06-01" })],
+      [ex({ amount: 300, date: "2026-06-03" })],
+      { income: [inc({ amount: 500, date: "2026-06-02" })], opening: 10000 }
+    );
+    assert.deepEqual(entries.map(e => e.ref), ["EX", "IC", "IN"]);
+    assert.deepEqual(entries.map(e => e.balance), [10000 + 100000 + 50000 - 30000, 10000 + 100000 + 50000, 10000 + 100000]);
+  });
+
+  test("income with a bad date or amount is reported, not counted", () => {
+    const { entries, problems } = build([], [], {
+      income: [inc({ id: "recC2", date: "" }), inc({ id: "recC3", amount: null }), inc({ id: "recC4" })],
+    });
+    assert.equal(entries.length, 1);
+    assert.deepEqual(problems.map(p => [p.ref, p.id, p.reason]), [["IC", "recC2", "no_date"], ["IC", "recC3", "no_amount"]]);
+  });
+
+  test("omitting opts.income changes nothing", () => {
+    const a = build([inv()], [ex()]);
+    const b = build([inv()], [ex()], { income: undefined });
+    assert.deepEqual(a.entries, b.entries);
+  });
+
+  test("income is counted in totals and byMonth as money in", () => {
+    const { entries } = build([], [ex({ amount: 100 })], { income: [inc({ amount: 400 })] });
+    assert.deepEqual(totals(entries), { in: 40000, out: 10000, net: 30000 });
+    assert.equal(byMonth(entries)[0].in, 40000);
+  });
+
+  test("a future-dated income row is flagged future", () => {
+    const { entries } = build([], [], { income: [inc({ date: "2026-07-01" })] });
+    assert.equal(entries[0].future, true);
+  });
+});
+
+describe("validateIncomeFields", () => {
+  const fid = { desc: "fldDesc", date: "fldDate", amount: "fldAmt", source: "fldSrc" };
+  const good = { fldDesc: "Retainer", fldDate: "2026-06-01", fldAmt: 5000, fldSrc: "Retainer" };
+  const v = (f, create = false) => validateIncomeFields(f, fid, { create });
+
+  test("valid create and patch", () => {
+    assert.deepEqual(v(good, true), []);
+    assert.deepEqual(v({ fldAmt: 10 }), []);
+  });
+  test("create requires description, date, amount", () => {
+    for (const k of ["fldDesc", "fldDate", "fldAmt"]) {
+      const f = { ...good }; delete f[k];
+      assert.ok(v(f, true).length > 0, k);
+    }
+  });
+  test("rejects blank text, bad amount, impossible date, unknown source", () => {
+    assert.equal(v({ fldDesc: "  " }).length, 1);
+    assert.equal(v({ fldAmt: "abc" }).length, 1);
+    assert.equal(v({ fldDate: "2026-02-31" }).length, 1);
+    assert.equal(v({ fldSrc: "Lottery" }).length, 1);
+  });
+  test("null source clears the select", () => {
+    assert.deepEqual(v({ fldSrc: null }), []);
   });
 });

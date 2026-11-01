@@ -8,6 +8,10 @@ export const EXPENSE_CATEGORIES = Object.freeze([
   "Taxes & government", "Client refund", "Other",
 ]);
 
+export const INCOME_SOURCES = Object.freeze([
+  "Client payment", "Retainer", "One-off project", "Referral / commission", "Refund received", "Other",
+]);
+
 const CAP = 1e13;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -105,6 +109,19 @@ export function buildLedger(invoices, expenses, opts = {}) {
     });
   }
 
+  for (const r of opts.income || []) {
+    const date = manilaDate(r.date);
+    if (!date) { problems.push({ ref: "IC", id: r.id, reason: "no_date" }); continue; }
+    const amount = toCentavos(r.amount);
+    if (amount === null) { problems.push({ ref: "IC", id: r.id, reason: "no_amount" }); continue; }
+    rows.push({
+      id: r.id, kind: "in", date, month: date.slice(0, 7), amount, signed: amount,
+      category: r.source || "Other income",
+      label: r.desc || "",
+      ref: "IC", created: r.created || "", future: date > today, balance: 0,
+    });
+  }
+
   rows.sort((a, b) =>
     cmp(a.date, b.date) ||
     cmp(a.kind === "in" ? 0 : 1, b.kind === "in" ? 0 : 1) ||
@@ -165,6 +182,14 @@ export function filterEntries(entries, { month, category } = {}) {
 }
 
 export function validateExpenseFields(fields, fid, { create = false } = {}) {
+  return validateMoneyFields(fields, fid, create, "category", EXPENSE_CATEGORIES);
+}
+
+export function validateIncomeFields(fields, fid, { create = false } = {}) {
+  return validateMoneyFields(fields, fid, create, "source", INCOME_SOURCES);
+}
+
+function validateMoneyFields(fields, fid, create, selKey, allowed) {
   const errs = [];
   const f = fields || {};
   const has = k => Object.prototype.hasOwnProperty.call(f, fid[k]);
@@ -176,6 +201,6 @@ export function validateExpenseFields(fields, fid, { create = false } = {}) {
   if (has("desc") && (typeof v("desc") !== "string" || !v("desc").trim())) errs.push("desc must be non-empty text");
   if (has("amount") && toCentavos(v("amount")) === null) errs.push("amount is not a valid peso amount");
   if (has("date") && !realDate(v("date"))) errs.push("date must be a real YYYY-MM-DD date");
-  if (has("category") && v("category") !== null && !EXPENSE_CATEGORIES.includes(v("category"))) errs.push("category is not an allowed option");
+  if (has(selKey) && v(selKey) !== null && !allowed.includes(v(selKey))) errs.push(`${selKey} is not an allowed option`);
   return errs;
 }
