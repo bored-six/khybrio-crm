@@ -391,7 +391,11 @@ function showLogin(msg){authed=false;
 /* ---------- Airtable I/O (through /api/records) ---------- */
 async function api(method,payload,table){
   const url=method==="GET"?"/api/records?table="+encodeURIComponent(table):"/api/records";
-  const r=await fetch(url,{method,headers:payload?{"Content-Type":"application/json"}:{},body:payload?JSON.stringify(payload):undefined,credentials:"same-origin"});
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
+  let r;
+  try{r=await fetch(url,{method,headers:payload?{"Content-Type":"application/json"}:{},body:payload?JSON.stringify(payload):undefined,credentials:"same-origin",signal:ctl.signal})}
+  catch(err){const e=new Error(err.name==="AbortError"?"Request timed out":"Network error");e.code="network";throw e}
+  finally{clearTimeout(timer)}
   if(r.status===401){showLogin("Your session ended. Log in again.");const e=new Error("login");e.code="login";throw e}
   const j=await r.json().catch(()=>({}));
   if(!r.ok){const e=new Error(j.message||("Server error "+r.status));e.code=j.error||"http";throw e}
@@ -399,13 +403,18 @@ async function api(method,payload,table){
 let loading=false;
 async function loadAll(){if(loading||!authed)return;loading=true;setSync();
   try{const exP=api("GET",null,T.EX.id).then(p=>({p}),e=>({e}));
-    const res=await Promise.all(CORE.map(t=>api("GET",null,T[t].id).then(p=>[t,p])));
-    res.forEach(([t,p])=>{S[t]=(p.records||[]).map(r=>norm(t,r));loaded[t]=true});
+    const res=await Promise.allSettled(CORE.map(t=>api("GET",null,T[t].id)));
+    let failed=null;
+    res.forEach((o,i)=>{const t=CORE[i];
+      if(o.status==="fulfilled"){S[t]=(o.value.records||[]).map(r=>norm(t,r));loaded[t]=true}
+      else if(!failed||o.reason.code==="login")failed=o.reason});
     const ex=await exP;
     if(ex.p){S.EX=(ex.p.records||[]).map(r=>norm("EX",r));exErr=null}else if(!ex.e||ex.e.code!=="login"){exErr=(ex.e&&ex.e.message)||"unknown error"}
     loaded.EX=true;
-    lastSync=Date.now();clearBanner();render()}
-  catch(e){if(e.code!=="login")showBanner(e.code,e.code==="not_configured"?e.message:"Couldn't load from Airtable: "+e.message+(lastSync?". Showing what was loaded earlier.":""))}
+    if(failed&&failed.code==="login")return;
+    if(failed){showBanner(failed.code,failed.code==="not_configured"?failed.message:"Couldn't load some data from Airtable: "+failed.message+(lastSync?". Showing what was loaded earlier.":""))}
+    else{lastSync=Date.now();clearBanner()}
+    render()}
   finally{loading=false;setSync()}}
 const refreshAll=()=>loadAll();
 async function write(method,tbl,records){
@@ -554,7 +563,7 @@ function openForm(kind,rec,ctx){
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if($("#modalHost").firstChild)$("#modalHost").replaceChildren();else if(openClient)closeClient()}});
 
 /* ---------- views ---------- */
-function loadingOr(tbls,fn){if(tbls.some(t=>!loaded[t])&&!pageErr)return h("div",{class:"card skel",text:"Loading from Airtable…"});if(pageErr&&tbls.some(t=>!loaded[t]))return h("div",{class:"card muted",text:"Airtable didn't load. Use Try again above."});return fn()}
+function loadingOr(tbls,fn){if(!authed&&tbls.some(t=>!loaded[t]))return h("div");if(tbls.some(t=>!loaded[t])&&!pageErr)return h("div",{class:"card skel",text:"Loading from Airtable…"});if(pageErr&&tbls.some(t=>!loaded[t]))return h("div",{class:"card muted",text:"Airtable didn't load. Use Try again above."});return fn()}
 function kpi(label,val,sub,alert){return h("div",{class:"kpi"+(alert?" alert":"")},h("span",{class:"label",text:label}),h("span",{class:"val num",text:val}),h("span",{class:"sub",text:sub||""}))}
 const openClients=()=>S.CL.filter(c=>OPEN.includes(c.stage));
 const dueList=()=>S.CL.filter(c=>{const s=fuStatus(c);return s==="Overdue"||s==="Due today"}).sort((a,b)=>String(a.next).localeCompare(String(b.next)));
