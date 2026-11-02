@@ -1,5 +1,5 @@
 import { isAuthed } from "../lib/auth.js";
-import { validateExpenseFields } from "../public/money.js";
+import { validateExpenseFields, validateIncomeFields } from "../public/money.js";
 
 // Only these Khybrio Records tables can be read or written through the site.
 const BASE = process.env.AIRTABLE_BASE_ID || "app6fRankhuL6LyjF";
@@ -10,14 +10,23 @@ const TABLES = new Set([
   "tblS66t7fb8lBerx3", // Invoices
   "tblhhCSBErRCDmpgE", // Activity Log
   "tbljG1uprTR1n85UR", // Expenses
+  "tblMzpoYxbdynft6O", // Income
 ]);
 const EXPENSES = "tbljG1uprTR1n85UR";
+const INCOME = "tblMzpoYxbdynft6O";
 // Key -> field id for Expenses. Keep in sync with T.EX.f in index.html.
 const FID = {
   desc: "fldexOv0PbHazjQXx",
   date: "fldUhOSnJaaaG3HcA",
   amount: "fldpsZmX1nqQLI9vc",
   category: "fldzY4XPkNJ1H077o",
+};
+// Key -> field id for Income. Keep in sync with T.IC.f in index.html.
+const INCOME_FID = {
+  desc: "fldey4VDoM2Inl243",
+  date: "fldwucDvcJ6lvA6wc",
+  amount: "fld6aAy3EoMxg6V82",
+  source: "fldeOnyOdV7qly9AL",
 };
 const API = process.env.AIRTABLE_API_URL || "https://api.airtable.com/v0";
 
@@ -74,6 +83,12 @@ export default async function handler(req, res) {
       if (table === EXPENSES) {
         for (const r of clean) {
           const errs = validateExpenseFields(r.fields, FID, { create: req.method === "POST" });
+          if (errs.length) return res.status(400).json({ error: "bad_fields", message: errs.join("; ") });
+        }
+      }
+      if (table === INCOME) {
+        for (const r of clean) {
+          const errs = validateIncomeFields(r.fields, INCOME_FID, { create: req.method === "POST" });
           if (errs.length) return res.status(400).json({ error: "bad_fields", message: errs.join("; ") });
         }
       }
