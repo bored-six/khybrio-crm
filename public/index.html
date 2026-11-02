@@ -21,6 +21,7 @@
   --ok:#1f7a55; --warn:#b26a12; --bad:#c2410c; --hot:#e8622d;
   --st-early:#5a7370; --st-mid:#00767f; --st-late:#b26a12; --st-won:#1c4d4a; --st-done:#0f2b29; --st-lost:#c2410c;
   --shadow:0 14px 40px rgba(15,43,41,.16);
+  --c-in:#1f7a55; --c-out:#e8622d;
   --radius:20px; --radius-sm:12px;
   --f-display:"Fraunces",ui-serif,Georgia,serif;
   --f-body:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -32,6 +33,7 @@
   --band:#0e2725; --band-fg:#f5f7f6; --band-muted:#a9c6c3; --band-line:rgba(169,198,195,.18);
   --ok:#5cc79a; --warn:#e8a54a; --bad:#ff8a5c; --hot:#e8622d;
   --st-early:#a9c6c3; --st-mid:#3fb8b0; --st-late:#e8a54a; --st-won:#7fd6cf; --st-done:#f5f7f6; --st-lost:#ff8a5c;
+  --c-in:#3fa277; --c-out:#e46c3d;
   --shadow:0 14px 40px rgba(0,0,0,.5); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0b1f1d; --panel:#112b28; --sunk:#16352f; --line:#244a46; --fg:#f5f7f6; --muted:#a9c6c3;
@@ -39,6 +41,7 @@
   --band:#0e2725; --band-fg:#f5f7f6; --band-muted:#a9c6c3; --band-line:rgba(169,198,195,.18);
   --ok:#5cc79a; --warn:#e8a54a; --bad:#ff8a5c; --hot:#e8622d;
   --st-early:#a9c6c3; --st-mid:#3fb8b0; --st-late:#e8a54a; --st-won:#7fd6cf; --st-done:#f5f7f6; --st-lost:#ff8a5c;
+  --c-in:#3fa277; --c-out:#e46c3d;
   --shadow:0 14px 40px rgba(0,0,0,.5); color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--f-body);margin:0}
@@ -246,20 +249,47 @@ html{padding-top:env(safe-area-inset-top,0px)}
 .modes button{border:0;background:none;color:var(--band-muted);padding:5px 14px;border-radius:999px;cursor:pointer;font-weight:600;font-size:13px}
 .modes button[aria-pressed="true"]{background:var(--band-fg);color:var(--teal-deep)}
 .modes button:not([aria-pressed="true"]):hover{color:var(--band-fg)}
+/* charts: marks in a stretched SVG, text and hover in HTML */
+.mstack{display:flex;flex-direction:column;gap:16px}
+.grid2.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media (max-width:900px){.grid2.even{grid-template-columns:1fr}}
+.chart{display:grid;grid-template-columns:52px minmax(0,1fr);column-gap:10px;position:relative}
+.ylab{position:relative}
+.ylab span{position:absolute;right:0;transform:translateY(-50%);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.carea{position:relative;touch-action:pan-y;cursor:crosshair}
+.plot{position:relative}.plot.strip{margin-top:8px}
+.cv{display:block;width:100%;height:100%;overflow:visible}
+.cv .grid{stroke:var(--line);stroke-width:1}.cv .zero{stroke:var(--muted);stroke-width:1}
+.cv .bline{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.cv .bline.fut{stroke-dasharray:5 5;opacity:.6}
+.cv .bin{fill:var(--c-in)}.cv .bout{fill:var(--c-out)}.cv .dim{opacity:.45}
+.xlab{position:relative;height:18px;margin-top:8px}
+.xlab span{position:absolute;transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap}
+.cross{position:absolute;top:0;bottom:26px;width:1px;background:var(--muted);opacity:.45;pointer-events:none}
+.cdot{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--panel);transform:translate(-50%,-50%);pointer-events:none}
+.ctip{position:absolute;top:0;z-index:2;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:8px 11px;font-size:12.5px;pointer-events:none;min-width:160px}
+.ctip b{display:block;margin-bottom:4px;font-weight:600}
+.ctip .r{display:flex;justify-content:space-between;gap:14px;font-variant-numeric:tabular-nums}
+.ctip .r span:first-child{color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.key{width:9px;height:9px;border-radius:2px;display:inline-block}
+.key.in{background:var(--c-in)}.key.out{background:var(--c-out)}.key.bal{background:var(--accent);height:2px;width:14px;border-radius:1px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+table.ledger td.neg{color:var(--hot)}
+table.ledger tr.future td{color:var(--muted)}
+.show-sm{display:none}
+@media (max-width:560px){.kpis.money .val{font-size:26px}.kpis.money .kpi{padding:14px}.hide-sm{display:none}.show-sm{display:block}.chart{grid-template-columns:40px minmax(0,1fr);column-gap:6px}}
+.seg.small{grid-column:auto;flex:0 0 auto}.seg.small button{padding:5px 12px;flex:0 0 auto}
 .seg{display:flex;background:var(--sunk);border-radius:999px;padding:3px;gap:2px;grid-column:1/-1}
 .seg button{flex:1;border:0;background:none;padding:8px 12px;border-radius:999px;cursor:pointer;font-weight:600;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(15,43,41,.15)}
 .seg button[data-k="income"][aria-pressed="true"]{color:var(--ok)}.seg button[data-k="expense"][aria-pressed="true"]{color:var(--hot)}
-.trow{cursor:pointer}.trow.sel span:first-child{font-weight:700}
-.tpair{display:flex;flex-direction:column;gap:3px}
-.tbar{height:9px;border-radius:99px;min-width:2px}
-.tbar.in{background:var(--ok)}.tbar.out{background:color-mix(in srgb,var(--hot) 70%,transparent)}
 .fval.neg{color:var(--hot)}
-.trendkey{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .trendkey .k{width:10px;height:10px;border-radius:50%}.trendkey .k.in{background:var(--ok)}.trendkey .k.out{background:var(--hot)}.trendkey .k.out{margin-left:6px}
 .monthnav{display:flex;align-items:center;gap:2px}
 .monthnav .mono{min-width:112px;text-align:center;font-weight:600}
 .kpis.money .val{white-space:nowrap}
+.kpis.money .kpi.txt .val{font-size:22px;white-space:normal;line-height:1.25;margin-block:6px 4px}
 table.ledger td.in{color:var(--ok)}
 table.ledger td.bal{font-weight:600}
 table.ledger td.bal.neg{color:var(--hot)}
@@ -294,6 +324,9 @@ table.ledger tr.opening td{background:var(--sunk);color:var(--muted);font-style:
     <nav class="tabs" id="moneyTabs" role="tablist" hidden>
       <button type="button" role="tab" data-tab="money-overview" aria-selected="false">Overview</button>
       <button type="button" role="tab" data-tab="money-ledger" aria-selected="false">Ledger</button>
+      <button type="button" role="tab" data-tab="money-in" aria-selected="false">Money in</button>
+      <button type="button" role="tab" data-tab="money-out" aria-selected="false">Money out</button>
+      <button type="button" role="tab" data-tab="money-reports" aria-selected="false">Reports</button>
     </nav>
   </div>
 </header>
@@ -739,82 +772,183 @@ const mLabel=(mk,short)=>new Date(mk+"-01T00:00:00Z").toLocaleDateString("en-US"
 const mSigned=c=>(c<0?"−":"+")+peso(Math.abs(c)/100);
 const mBal=c=>(c<0?"−":"")+peso(Math.abs(c)/100);
 
+const SVGNS="http://www.w3.org/2000/svg";
+function se(tag,a){const e=document.createElementNS(SVGNS,tag);for(const k in a||{})if(a[k]!=null)e.setAttribute(k,a[k]);return e}
+const axisPeso=c=>(c<0?"−":"")+pesoShort(Math.abs(c)/100);
+function niceTicks(lo,hi,n){if(hi<=lo)hi=lo+100;const raw=(hi-lo)/n,p=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,2.5,5,10].map(m=>m*p).find(s=>s>=raw);
+  const a=Math.floor(lo/st)*st,b=Math.ceil(hi/st)*st,t=[];for(let v=a;v<=b+st/2;v+=st)t.push(Math.round(v));return t}
+// One plot: SVG marks stretched to the box, labels and hover layer in HTML so text never scales.
+function chart(o){
+  const ticks=niceTicks(o.lo,o.hi,4),lo=ticks[0],hi=ticks[ticks.length-1];
+  const X=i=>(i+.5)/o.n*1000,Y=v=>o.h-(v-lo)/(hi-lo)*o.h;
+  const svg=se("svg",{viewBox:`0 0 1000 ${o.h}`,preserveAspectRatio:"none",class:"cv","aria-hidden":"true"});
+  ticks.forEach(t=>svg.append(se("line",{x1:0,x2:1000,y1:Y(t),y2:Y(t),class:t===0&&lo<0?"zero":"grid","vector-effect":"non-scaling-stroke"})));
+  o.marks(svg,X,Y);
+  const dot=h("div",{class:"cdot",hidden:true}),plot=h("div",{class:"plot",style:`height:${o.h}px`},svg,dot);
+  const parts=[plot];
+  if(o.strip){const s=se("svg",{viewBox:`0 0 1000 ${o.strip.h}`,preserveAspectRatio:"none",class:"cv","aria-hidden":"true"});o.strip.marks(s,X);parts.push(h("div",{class:"plot strip",style:`height:${o.strip.h}px`},s))}
+  const cross=h("div",{class:"cross",hidden:true}),tip=h("div",{class:"ctip",hidden:true});
+  const area=h("div",{class:"carea"},parts,cross,h("div",{class:"xlab"},o.xlab.map(([i,t])=>h("span",{style:`left:${X(i)/10}%`,text:t}))));
+  const wrap=h("div",{class:"chart",role:"img","aria-label":o.title},h("div",{class:"ylab",style:`height:${o.h}px`},ticks.map(t=>h("span",{style:`top:${Y(t)/o.h*100}%`,text:axisPeso(t)}))),area,tip);
+  const show=e=>{const r=plot.getBoundingClientRect();if(!r.width)return;const i=Math.max(0,Math.min(o.n-1,Math.floor((e.clientX-r.left)/r.width*o.n))),px=X(i)/1000;
+    cross.hidden=tip.hidden=false;cross.style.left=px*100+"%";
+    if(o.dot){dot.hidden=false;dot.style.left=px*100+"%";dot.style.top=Y(o.dot(i))/o.h*100+"%"}
+    const t=o.tip(i);tip.replaceChildren(h("b",{text:t.title}),...t.rows.map(([k,v,cls])=>h("div",{class:"r"},h("span",null,cls?h("i",{class:"key "+cls}):null,k),h("span",{text:v}))));
+    const wr=wrap.getBoundingClientRect(),ar=area.getBoundingClientRect(),x=ar.left-wr.left+px*ar.width,tw=tip.offsetWidth||170;
+    tip.style.left=Math.max(0,Math.min(wr.width-tw,x>wr.width/2?x-tw-12:x+12))+"px"};
+  area.addEventListener("pointermove",show);area.addEventListener("pointerdown",show);
+  area.addEventListener("pointerleave",()=>{cross.hidden=tip.hidden=dot.hidden=true});
+  return wrap}
+const legend=items=>h("div",{class:"legend"},items.map(([cls,t])=>h("span",null,h("i",{class:"key "+cls}),t)));
+function catBars(list,kind,emptyText){if(!list.length)return h("div",{class:"empty",text:emptyText});const max=Math.max(1,...list.map(c=>c.out));
+  return h("div",{class:"funnel"},list.map(c=>h("div",{class:"frow"},h("span",{text:c.category}),
+    h("div",{class:"ftrack"},h("div",{class:"ffill",style:`width:${c.out/max*100}%;background:color-mix(in srgb,var(--c-${kind}) 55%,transparent)`}),h("span",{class:"fcount",text:Math.round(c.share*100)+"%"})),
+    h("span",{class:"fval",text:peso(c.out/100)}))))}
+const kpiTxt=(...a)=>{const k=kpi(...a);k.classList.add("txt");return k};
+function pctDelta(now,before,lbl){if(!before)return now?"Nothing in "+lbl:"Same as "+lbl;const p=Math.round((now-before)/before*100);return (p>0?"+":p<0?"−":"")+Math.abs(p)+"% vs "+lbl}
+function downloadCSV(name,text){const a=h("a",{href:URL.createObjectURL(new Blob(["﻿"+text],{type:"text/csv"})),download:name});document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},0)}
+
 function viewMoney(part){
   if(!M)return Mfail?h("div",{class:"banner bad"},h("p",{text:"The Money Tracker couldn't load its script. Refresh the page."})):h("div",{class:"card skel",text:"Loading from Airtable…"});
-  return loadingOr(["IN","EX"],()=>{
-    const F=fx.money,today=todayStr(),cur=today.slice(0,7);if(!F.month)F.month=cur;const mk=F.month,ml=mLabel(mk);
+  return loadingOr(["IN","EX","IC"],()=>{
+    const F=fx.money,today=todayStr(),cur=today.slice(0,7);if(!F.month)F.month=cur;const mk=F.month,ml=mLabel(mk),pk=mShift(mk,-1),pl=mLabel(pk,1);
     const {entries,problems}=M.buildLedger(S.IN,S.EX,{today,income:S.IC,clientName:x=>clientsFor(Array.isArray(x)?x:[x])});
-    const mine=entries.filter(e=>e.month===mk),rows=mine.slice().reverse();
-    const prev=entries.find(e=>e.month<mk),opening=prev?prev.balance:0,closing=rows.length?rows[rows.length-1].balance:opening;
-    const tot=M.totals(mine),nIn=mine.filter(e=>e.kind==="in").length,nOut=mine.length-nIn;
+    const mine=entries.filter(e=>e.month===mk),tot=M.totals(mine),ptot=M.totals(entries.filter(e=>e.month===pk));
     const kindOf=ref=>ref==="IN"?"invoice":ref==="IC"?"income":"expense";
     const open=e=>{const r=byId(e.ref,e.id);if(r)openForm(kindOf(e.ref),r)};
     const add=()=>h("button",{class:"btn small primary",type:"button",text:"+ Add money",onclick:()=>openForm(lastMoneyKind)});
-    const nav=h("div",{class:"monthnav"},
+    const monthNav=()=>h("div",{class:"monthnav"},
       h("button",{class:"btn small ghost",type:"button","aria-label":"Previous month",onclick:()=>{F.month=mShift(mk,-1);render()}},svgI(G_PREV)),
       h("span",{class:"mono","aria-live":"polite",text:ml}),
       h("button",{class:"btn small ghost",type:"button","aria-label":"Next month",disabled:mk>=cur,onclick:()=>{F.month=mShift(mk,1);render()}},svgI(G_NEXT)));
+    const head=(title,nav,...extra)=>h("div",{class:"section-head"},h("h2",{text:title}),nav,extra,add());
     const notices=[];
     if(icErr)notices.push(h("div",{class:"banner bad"},h("p",{text:"Income couldn't load ("+icErr+"). Manual income is missing from the totals until this is fixed."}),h("button",{class:"btn small",type:"button",text:"Try again",onclick:()=>loadAll()})));
-    if(exErr)notices.push(h("div",{class:"banner bad"},h("p",{text:"Expenses couldn't load ("+exErr+"). Money in still shows; money out and the balance are incomplete until this is fixed."}),h("button",{class:"btn small",type:"button",text:"Try again",onclick:()=>loadAll()})));
+    if(exErr)notices.push(h("div",{class:"banner bad"},h("p",{text:"Expenses couldn't load ("+exErr+"). Money out and the balance are incomplete until this is fixed."}),h("button",{class:"btn small",type:"button",text:"Try again",onclick:()=>loadAll()})));
     if(problems&&problems.length){const cnt=r=>problems.filter(p=>p.ref===r).length,ni=cnt("IN"),nc=cnt("IC"),ne=cnt("EX"),bits=[];
       if(ni)bits.push(`${ni} paid invoice${ni===1?"":"s"}`);if(nc)bits.push(`${nc} income entr${nc===1?"y":"ies"}`);if(ne)bits.push(`${ne} expense${ne===1?"":"s"}`);
       notices.push(h("div",{class:"banner"},h("p",{text:`${bits.join(" and ")} need${problems.length===1?"s":""} a date or amount, so ${problems.length===1?"it is":"they are"} left out of the ledger.`}),
         h("button",{class:"btn small",type:"button",text:"Open first",onclick:()=>{const p=problems[0],r=byId(p.ref,p.id);if(r)openForm(kindOf(p.ref),r)}})))}
-    const wrapV=(...kids)=>h("div",{style:"display:flex;flex-direction:column;gap:16px"},...kids);
+    const wrapV=(...kids)=>h("div",{class:"mstack"},...kids);
+    const amt=e=>h("span",{class:"mono",style:e.kind==="in"?"color:var(--ok)":null,text:mSigned(e.signed)});
+    const entryList=(list,emptyText)=>list.length?h("div",{class:"list"},list.map(e=>h("div",{class:"li"},h("span",{class:"t",text:e.label||"(no description)",onclick:()=>open(e)}),amt(e),
+      h("div",{class:"m"},h("span",{text:fdate(e.date)+(e.future?" · upcoming":"")}),pill(e.category,e.kind==="in"?"f-ok":"s-early"))))):h("div",{class:"empty",text:emptyText});
 
-    if(part==="ledger"){
-      const dash=()=>h("span",{class:"muted",text:"–"});
-      const body=rows.map(e=>{const isIn=e.kind==="in";return h("tr",{onclick:()=>open(e)},
-        h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{text:e.label||"–"}),h("td",null,pill(e.category,"s-early")),
-        h("td",{class:"r mono in"},isIn?mSigned(e.signed):dash()),h("td",{class:"r mono out"},isIn?dash():mSigned(e.signed)),
-        h("td",{class:"r mono bal"+(e.balance<0?" neg":"")},mBal(e.balance)))});
-      const openRow=h("tr",{class:"opening"},h("td",{colspan:"5",text:"Carried from "+mLabel(mShift(mk,-1),1)}),h("td",{class:"r mono",text:mBal(opening)}));
-      const showTable=rows.length||opening!==0;
-      const table=h("table",{class:"ledger"},
-        h("thead",null,h("tr",null,["Date","Description","Category","In","Out","Balance"].map((t,i)=>h("th",{class:i>=3?"r mono":null,text:t})))),
-        h("tbody",null,openRow,body),
-        rows.length?h("tfoot",null,h("tr",null,h("td",{text:"Month total"}),h("td"),h("td"),h("td",{class:"r mono",text:"+"+peso(tot.in/100)}),h("td",{class:"r mono",text:"−"+peso(tot.out/100)}),h("td",{class:"r mono"+(closing<0?" neg":""),text:mBal(closing)}))):null);
-      const li=(title,right,meta,cls,click)=>h("div",{class:"li"+(cls?" "+cls:"")},h("span",{class:"t",text:title,onclick:click}),right,h("div",{class:"m"},meta));
-      const list=h("div",{class:"card list ledger-list"},
-        li("Carried from "+mLabel(mShift(mk,-1),1),h("span",{class:"mono muted",text:mBal(opening)}),null,"muted"),
-        rows.map(e=>{const isIn=e.kind==="in";return li(e.label||"–",
-          h("span",{class:"mono",style:"display:inline-flex;align-items:center;gap:5px"+(isIn?";color:var(--ok)":""),"aria-label":isIn?"Money in":"Money out"},svgI(isIn?G_IN:G_OUT),mSigned(e.signed)),
-          [h("span",{text:fdate(e.date)}),pill(e.category,"s-early"),h("span",{class:e.balance<0?"":"muted",style:e.balance<0?"color:var(--hot)":null,text:"Bal "+mBal(e.balance)})],null,()=>open(e))}),
-        rows.length?li("Closing balance",h("span",{class:"mono muted",text:mBal(closing)}),null,"muted"):null);
-      const empty=h("div",{class:"card empty"},h("p",{style:"margin:0 0 10px",text:`Nothing in or out for ${ml}. Add income or an expense, or mark an invoice Paid in Quotes & billing and it shows up here.`}),add());
-      return wrapV(
-        h("div",{class:"section-head"},h("h2",{text:"Ledger"}),nav,add()),
-        notices,
-        showTable?[h("div",{class:"tablewrap"},table),list]:null,
-        rows.length?null:empty)}
+    /* ---- overview ---- */
+    if(part==="overview"){
+      const bal=M.balanceAsOf(entries,today);
+      const k=h("div",{class:"kpis money"},
+        kpi("Balance today",mBal(bal),"Everything in minus everything out",bal<0),
+        kpi("Money in",pesoShort(tot.in/100),pctDelta(tot.in,ptot.in,pl)),
+        kpi("Money out",pesoShort(tot.out/100),pctDelta(tot.out,ptot.out,pl)),
+        kpi("Net this month",(tot.net<0?"−":"+")+pesoShort(Math.abs(tot.net)/100),tot.net<0?"Spent more than came in":"Kept after spending",tot.net<0));
+      const {opening,days}=M.dailySeries(entries,mk),n=days.length,ti=mk<cur?n-1:mk>cur?-1:Number(today.slice(8,10))-1;
+      const bals=days.map(d=>d.balance),maxIO=Math.max(1,...days.map(d=>Math.max(d.in,d.out)));
+      const bLo=Math.min(opening,...bals),bHi=Math.max(opening,...bals),pad=Math.max((bHi-bLo)*.2,Math.abs(bHi)*.05,10000);
+      const balChart=chart({n,h:200,lo:bLo-pad,hi:bHi+pad,title:`Balance through ${ml}`,
+        marks:(svg,X,Y)=>{const pt=i=>`${X(i).toFixed(1)},${Y(bals[i]).toFixed(1)}`,all=days.map((_,i)=>pt(i));
+          const cut=Math.max(0,ti);
+          if(cut>=0)svg.append(se("path",{class:"bline",d:"M"+all.slice(0,cut+1).join(" L"),"vector-effect":"non-scaling-stroke"}));
+          if(cut<n-1)svg.append(se("path",{class:"bline fut",d:"M"+all.slice(cut).join(" L"),"vector-effect":"non-scaling-stroke"}))},
+        strip:{h:56,marks:(s,X)=>{const w=1000/n*.62,mid=28;s.append(se("line",{x1:0,x2:1000,y1:mid,y2:mid,class:"grid","vector-effect":"non-scaling-stroke"}));days.forEach((d,i)=>{
+          if(d.in)s.append(se("rect",{class:"bin",x:X(i)-w/2,width:w,y:mid-1-d.in/maxIO*(mid-2),height:d.in/maxIO*(mid-2)}));
+          if(d.out)s.append(se("rect",{class:"bout",x:X(i)-w/2,width:w,y:mid+1,height:d.out/maxIO*(mid-2)}))})}},
+        xlab:[0,7,14,21,n-1].map(i=>[i,fdate(days[i].date)]),dot:i=>bals[i],
+        tip:i=>{const d=days[i];return{title:fdate(d.date)+(i>ti?" (upcoming)":""),rows:[["Balance",mBal(d.balance),"bal"],["In",d.in?"+"+peso(d.in/100):"–","in"],["Out",d.out?"−"+peso(d.out/100):"–","out"]]}}});
+      const balCard=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:14px"},h("h2",{text:"Balance"}),legend([["bal","Balance"],["in","Money in"],["out","Money out"]])),
+        h("p",{class:"muted",style:"margin:-8px 0 12px;font-size:13px",text:`Started ${ml} at ${mBal(opening)}. Bars under the line show what came in (up) and went out (down) each day.`}),balChart);
+      const where=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:"Where it went"}),h("button",{class:"btn small",type:"button",text:"Money out",onclick:()=>go("money-out")})),catBars(M.byCategory(mine,"out").slice(0,6),"out","Nothing went out in "+mLabel(mk,1)+"."));
+      const from=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:"Where it came from"}),h("button",{class:"btn small",type:"button",text:"Money in",onclick:()=>go("money-in")})),catBars(M.byCategory(mine,"in").slice(0,6),"in","Nothing came in during "+mLabel(mk,1)+"."));
+      const latest=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:6px"},h("h2",{text:"Latest entries"}),h("button",{class:"btn small",type:"button",text:"Open ledger",onclick:()=>go("money-ledger")})),
+        entryList(mine.slice(0,8),`Nothing recorded for ${ml} yet.`));
+      return wrapV(head("Money Tracker",monthNav()),notices,k,balCard,h("div",{class:"grid2 even"},where,from),latest)}
 
-    const k=h("div",{class:"kpis money"},
-      kpi("Balance today",mBal(M.balanceAsOf(entries,today)),"All time, to date",M.balanceAsOf(entries,today)<0),
-      kpi("Money in",pesoShort(tot.in/100),`${nIn} payment${nIn===1?"":"s"} received`),
-      kpi("Money out",pesoShort(tot.out/100),`${nOut} expense${nOut===1?"":"s"}`),
-      kpi("Net",(tot.net<0?"−":"+")+pesoShort(Math.abs(tot.net)/100),"In minus out",tot.net<0));
-    const cats=M.byCategory(mine),maxC=Math.max(1,...cats.map(c=>c.out));
-    const bars=cats.length?h("div",{class:"funnel"},cats.map(c=>h("div",{class:"frow"},h("span",{text:c.category}),
-      h("div",{class:"ftrack"},h("div",{class:"ffill",style:`width:${Math.max(0,c.out)/maxC*100}%;background:color-mix(in srgb,var(--accent) 45%,transparent)`}),h("span",{class:"fcount",text:Math.round(c.share*100)+"%"})),
-      h("span",{class:"fval",text:peso(c.out/100)})))):h("div",{class:"empty",text:"No spending recorded for "+mLabel(mk,1)+"."});
-    const top=mine.filter(e=>e.kind==="out").sort((a,b)=>b.amount-a.amount).slice(0,5);
-    const where=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:"Where it went"})),bars);
-    const big=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:6px"},h("h2",{text:"Biggest expenses"})),
-      top.length?h("div",{class:"list"},top.map(e=>h("div",{class:"li"},h("span",{class:"t",text:e.label||"(no description)",onclick:()=>open(e)}),h("span",{class:"mono",text:peso(e.amount/100)}),h("div",{class:"m"},h("span",{text:fdate(e.date)}),pill(e.category,"s-early"))))):h("div",{class:"empty",text:"Nothing yet."}));
-    const bm=new Map(M.byMonth(entries).map(b=>[b.month,b])),span=[];for(let i=5;i>=0;i--)span.push(mShift(cur,-i));
-    const maxM=Math.max(1,...span.map(m=>{const b=bm.get(m);return b?Math.max(b.in,b.out):0}));
-    const trend=h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:"Last 6 months"}),
-        h("span",{class:"trendkey"},h("span",{class:"k in"}),"In",h("span",{class:"k out"}),"Out")),
-      h("div",{class:"funnel"},span.map(m=>{const b=bm.get(m)||{in:0,out:0,net:0};
-        return h("div",{class:"frow trow"+(m===mk?" sel":""),onclick:()=>{F.month=m;render()}},h("span",{text:mLabel(m,1)+" "+m.slice(2,4)}),
-          h("div",{class:"tpair"},h("div",{class:"tbar in",style:`width:${b.in/maxM*100}%`}),h("div",{class:"tbar out",style:`width:${b.out/maxM*100}%`})),
-          h("span",{class:"fval"+(b.net<0?" neg":""),text:(b.net<0?"−":"+")+pesoShort(Math.abs(b.net)/100)}))})));
-    return wrapV(
-      h("div",{class:"section-head"},h("h2",{text:"Money Tracker"}),nav,add()),
-      notices,k,
-      h("div",{class:"grid2"},where,big),
-      trend)})}
+    /* ---- money in / money out ---- */
+    if(part==="in"||part==="out"){
+      const isIn=part==="in",side=mine.filter(e=>e.kind===part),now=isIn?tot.in:tot.out,before=isIn?ptot.in:ptot.out,cats=M.byCategory(mine,part);
+      const big=side.slice().sort((a,b)=>b.amount-a.amount)[0];
+      const k=h("div",{class:"kpis money"},
+        kpi(isIn?"Came in":"Went out",pesoShort(now/100),pctDelta(now,before,pl)),
+        kpi("Entries",String(side.length),side.length?"Avg "+peso(Math.round(now/side.length)/100):"None yet"),
+        kpiTxt(isIn?"Top source":"Top category",cats[0]?cats[0].category:"–",cats[0]?peso(cats[0].out/100)+" · "+Math.round(cats[0].share*100)+"%":"Nothing yet"),
+        kpi(isIn?"Biggest payment":"Biggest spend",big?peso(big.amount/100):"–",big?big.label||"(no description)":"Nothing yet"));
+      const span=[];for(let i=5;i>=0;i--)span.push(mShift(mk,-i));
+      const vals=span.map(m=>M.totals(entries.filter(e=>e.month===m))[part]);
+      const trend=chart({n:6,h:150,lo:0,hi:Math.max(1,...vals),title:`${isIn?"Money in":"Money out"} by month`,
+        marks:(svg,X,Y)=>{const w=1000/6*.5;vals.forEach((v,i)=>{if(v)svg.append(se("rect",{class:(isIn?"bin":"bout")+(span[i]===mk?"":" dim"),x:X(i)-w/2,width:w,y:Y(v),height:150-Y(v)}))})},
+        xlab:span.map((m,i)=>[i,mLabel(m,1)]),tip:i=>({title:mLabel(span[i]),rows:[[isIn?"In":"Out",peso(vals[i]/100),part]]})});
+      const rows=side.map(e=>h("tr",{onclick:()=>open(e)},h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{class:"wrapcell",text:e.label||"–"}),h("td",null,pill(e.category,isIn?"f-ok":"s-early")),h("td",{class:"r mono"+(isIn?" in":""),text:peso(e.amount/100)})));
+      const table=side.length?[h("div",{class:"tablewrap hide-sm"},h("table",{class:"ledger"},h("thead",null,h("tr",null,["Date","Description",isIn?"Source":"Category","Amount"].map((t,i)=>h("th",{class:i===3?"r":null,text:t})))),h("tbody",null,rows),
+          h("tfoot",null,h("tr",null,h("td",{text:"Total"}),h("td"),h("td"),h("td",{class:"r mono",text:peso(now/100)}))))),h("div",{class:"card show-sm"},entryList(side,""))]
+        :h("div",{class:"card empty",text:`Nothing ${isIn?"came in":"went out"} in ${ml}.`});
+      return wrapV(head(isIn?"Money in":"Money out",monthNav()),notices,k,
+        h("div",{class:"grid2"},h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:isIn?"By source":"By category"})),catBars(cats,part,"Nothing yet.")),
+          h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:"Last 6 months"})),trend)),
+        h("div",{class:"section-head"},h("h2",{text:"Entries"}),h("span",{class:"mono muted",text:`${side.length} in ${mLabel(mk,1)}`})),table)}
+
+    /* ---- reports ---- */
+    if(part==="reports"){
+      const cy=today.slice(0,4);if(!F.year)F.year=cy;const yr=F.year;
+      const months=M.monthlySeries(entries,yr),yt=M.totals(entries.filter(e=>e.date.startsWith(yr)));
+      const yNav=h("div",{class:"monthnav"},
+        h("button",{class:"btn small ghost",type:"button","aria-label":"Previous year",onclick:()=>{F.year=String(+yr-1);render()}},svgI(G_PREV)),
+        h("span",{class:"mono","aria-live":"polite",text:yr}),
+        h("button",{class:"btn small ghost",type:"button","aria-label":"Next year",disabled:yr>=cy,onclick:()=>{F.year=String(+yr+1);render()}},svgI(G_NEXT)));
+      const exp=h("button",{class:"btn small",type:"button",text:"Export CSV",onclick:()=>downloadCSV(`khybrio-ledger-${yr}.csv`,M.toCSV(entries.filter(e=>e.date.startsWith(yr))))});
+      const k=h("div",{class:"kpis money"},
+        kpi("In this year",pesoShort(yt.in/100),"Payments received"),kpi("Out this year",pesoShort(yt.out/100),"Everything spent"),
+        kpi("Net this year",(yt.net<0?"−":"+")+pesoShort(Math.abs(yt.net)/100),"In minus out",yt.net<0),
+        kpi("Closing balance",mBal(months[yr===cy?Number(cur.slice(5))-1:11].closing),yr===cy?"End of "+mLabel(cur,1):"End of Dec",months[11].closing<0));
+      const maxIn=Math.max(1,...months.map(m=>m.in)),maxOut=Math.max(1,...months.map(m=>m.out));
+      const ch=chart({n:12,h:220,lo:-maxOut,hi:maxIn,title:`Money in and out by month, ${yr}`,
+        marks:(svg,X,Y)=>{const w=1000/12*.5;months.forEach((m,i)=>{
+          if(m.in)svg.append(se("rect",{class:"bin",x:X(i)-w/2,width:w,y:Y(m.in),height:Y(0)-Y(m.in)-1}));
+          if(m.out)svg.append(se("rect",{class:"bout",x:X(i)-w/2,width:w,y:Y(0)+1,height:Y(-m.out)-Y(0)-1}))})},
+        xlab:months.map((m,i)=>[i,mLabel(m.month,1)]),
+        tip:i=>{const m=months[i];return{title:mLabel(m.month),rows:[["In","+"+peso(m.in/100),"in"],["Out","−"+peso(m.out/100),"out"],["Net",(m.net<0?"−":"+")+peso(Math.abs(m.net)/100)],["Closing",mBal(m.closing)]]}}});
+      const rows=months.map(m=>h("tr",{onclick:()=>{F.month=m.month;go("money-ledger")},class:m.month>cur?"future":null},h("td",{text:mLabel(m.month)}),
+        h("td",{class:"r mono in",text:m.in?"+"+peso(m.in/100):"–"}),h("td",{class:"r mono",text:m.out?"−"+peso(m.out/100):"–"}),
+        h("td",{class:"r mono"+(m.net<0?" neg":""),text:(m.net<0?"−":"+")+peso(Math.abs(m.net)/100)}),h("td",{class:"r mono bal"+(m.closing<0?" neg":""),text:m.month>cur?"–":mBal(m.closing)})));
+      const table=h("div",{class:"tablewrap"},h("table",{class:"ledger"},h("thead",null,h("tr",null,["Month","In","Out","Net","Closing balance"].map((t,i)=>h("th",{class:i?"r":null,text:t})))),h("tbody",null,rows),
+        h("tfoot",null,h("tr",null,h("td",{text:"Year"}),h("td",{class:"r mono",text:"+"+peso(yt.in/100)}),h("td",{class:"r mono",text:"−"+peso(yt.out/100)}),h("td",{class:"r mono",text:(yt.net<0?"−":"+")+peso(Math.abs(yt.net)/100)}),h("td")))));
+      return wrapV(head("Reports",yNav,exp),notices,k,
+        h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:14px"},h("h2",{text:"In and out by month"}),legend([["in","Money in"],["out","Money out"]])),ch),
+        h("div",{class:"section-head"},h("h2",{text:"Month by month"}),h("span",{class:"muted",style:"font-size:13px",text:"Click a month to open its ledger"})),table)}
+
+    /* ---- ledger ---- */
+    const L=F.ledger||(F.ledger={kind:"",cat:"",q:""});
+    const q=L.q.trim().toLowerCase();
+    const shown=mine.filter(e=>(!L.kind||e.kind===L.kind)&&(!L.cat||e.category===L.cat)&&(!q||(e.label+" "+e.category).toLowerCase().includes(q)));
+    const rows=shown.slice().reverse(),stot=M.totals(shown),filtered=shown.length!==mine.length;
+    const prev=entries.find(e=>e.month<mk),opening=prev?prev.balance:(entries.opening||0),closing=mine.length?mine[0].balance:opening;
+    const cats=[...new Set(mine.map(e=>e.category))].sort();
+    const kindSel=h("div",{class:"seg small",role:"group","aria-label":"Show"},[["","All"],["in","In"],["out","Out"]].map(([v,l])=>h("button",{type:"button","aria-pressed":String(L.kind===v),text:l,onclick:()=>{L.kind=v;render()}})));
+    const catSel=h("select",{"aria-label":"Category",onchange:e=>{L.cat=e.target.value;render()}},h("option",{value:"",text:"All categories"}),cats.map(c=>h("option",{value:c,text:c})));catSel.value=L.cat;
+    const search=h("input",{id:"ledgerSearch",type:"search",placeholder:"Search this month",value:L.q,oninput:e=>{L.q=e.target.value;const pos=e.target.selectionStart;render();const s=$("#ledgerSearch");if(s){s.focus();s.setSelectionRange(pos,pos)}}});
+    const exp=h("button",{class:"btn small",type:"button",text:"Export CSV",onclick:()=>downloadCSV(`khybrio-ledger-${mk}.csv`,M.toCSV(shown))});
+    const dash=()=>h("span",{class:"muted",text:"–"});
+    const body=rows.map(e=>{const isIn=e.kind==="in";return h("tr",{onclick:()=>open(e)},
+      h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{class:"wrapcell",text:e.label||"–"}),h("td",null,pill(e.category,isIn?"f-ok":"s-early")),
+      h("td",{class:"r mono in"},isIn?mSigned(e.signed):dash()),h("td",{class:"r mono out"},isIn?dash():mSigned(e.signed)),
+      h("td",{class:"r mono bal"+(e.balance<0?" neg":"")},mBal(e.balance)))});
+    const openRow=filtered?null:h("tr",{class:"opening"},h("td",{colspan:"5",text:"Carried from "+pl}),h("td",{class:"r mono",text:mBal(opening)}));
+    const table=h("table",{class:"ledger"},
+      h("thead",null,h("tr",null,["Date","Description","Category","In","Out","Balance"].map((t,i)=>h("th",{class:i>=3?"r":null,text:t})))),
+      h("tbody",null,openRow,body),
+      rows.length?h("tfoot",null,h("tr",null,h("td",{text:filtered?"Shown total":"Month total"}),h("td"),h("td"),h("td",{class:"r mono",text:"+"+peso(stot.in/100)}),h("td",{class:"r mono",text:"−"+peso(stot.out/100)}),h("td",{class:"r mono"+(closing<0?" neg":""),text:filtered?"":mBal(closing)}))):null);
+    const li=(title,right,meta,cls,click)=>h("div",{class:"li"+(cls?" "+cls:"")},h("span",{class:"t",text:title,onclick:click}),right,h("div",{class:"m"},meta));
+    const list=h("div",{class:"card list ledger-list"},
+      filtered?null:li("Carried from "+pl,h("span",{class:"mono muted",text:mBal(opening)}),null,"muted"),
+      rows.map(e=>{const isIn=e.kind==="in";return li(e.label||"–",
+        h("span",{class:"mono",style:"display:inline-flex;align-items:center;gap:5px"+(isIn?";color:var(--ok)":""),"aria-label":isIn?"Money in":"Money out"},svgI(isIn?G_IN:G_OUT),mSigned(e.signed)),
+        [h("span",{text:fdate(e.date)}),pill(e.category,isIn?"f-ok":"s-early"),h("span",{class:e.balance<0?"":"muted",style:e.balance<0?"color:var(--hot)":null,text:"Bal "+mBal(e.balance)})],null,()=>open(e))}),
+      rows.length&&!filtered?li("Closing balance",h("span",{class:"mono muted",text:mBal(closing)}),null,"muted"):null);
+    const empty=h("div",{class:"card empty"},h("p",{style:"margin:0 0 10px",text:filtered?"Nothing matches these filters.":`Nothing in or out for ${ml}. Add money, or mark an invoice Paid in Quotes & billing and it shows up here.`}),filtered?h("button",{class:"btn small",type:"button",text:"Clear filters",onclick:()=>{F.ledger={kind:"",cat:"",q:""};render()}}):add());
+    return wrapV(head("Ledger",monthNav(),exp),notices,
+      h("div",{class:"filters"},kindSel,catSel,search),
+      rows.length||(!filtered&&opening!==0)?[h("div",{class:"tablewrap"},table),list]:null,
+      rows.length?null:empty)})}
+
 
 /* ---------- client panel ---------- */
 function showClient(id){openClient=id;renderDrawer()}
@@ -850,13 +984,13 @@ function renderDrawer(){const host=$("#drawerHost");if(!openClient){host.replace
   const body=drawer.querySelector(".dbody");if(body)body.scrollTop=keepScroll}
 
 /* ---------- routing & render ---------- */
-const VIEWS={overview:viewOverview,pipeline:viewPipeline,leads:viewLeads,followups:viewFollowups,won:viewWon,billing:viewBilling,"money-overview":()=>viewMoney("overview"),"money-ledger":()=>viewMoney("ledger")};
+const VIEWS={overview:viewOverview,pipeline:viewPipeline,leads:viewLeads,followups:viewFollowups,won:viewWon,billing:viewBilling,"money-overview":()=>viewMoney("overview"),"money-ledger":()=>viewMoney("ledger"),"money-in":()=>viewMoney("in"),"money-out":()=>viewMoney("out"),"money-reports":()=>viewMoney("reports")};
 const isMoney=t=>t.startsWith("money");
 function go(t){if(t==="money")t="money-overview";if(!VIEWS[t])t="overview";tab=t;try{history.replaceState(null,"","#"+t)}catch(e){}try{localStorage.setItem("kcrm_tab",t)}catch(e){}render();window.scrollTo(0,0)}
 function render(){
   const mm=isMoney(tab);
   $("#tabs").hidden=mm;$("#moneyTabs").hidden=!mm;$("#newLeadBtn").hidden=mm;
-  $("#tagline").textContent=mm?"Cash in & out":"Clients & pipeline";
+  $("#tagline").textContent=mm?"Ledger & cash flow":"Clients & pipeline";
   document.querySelectorAll("#modes button").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.mode==="money")===mm)));
   document.querySelectorAll("#tabs button, #moneyTabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===tab)));
   $("#bLeads").textContent=String(openClients().length);
