@@ -17,6 +17,9 @@ import {
   filterEntries,
   validateExpenseFields,
   validateIncomeFields,
+  dailySeries,
+  monthlySeries,
+  toCSV,
 } from "../public/money.js";
 
 const TODAY = "2026-06-15";
@@ -659,5 +662,83 @@ describe("validateIncomeFields", () => {
   });
   test("null source clears the select", () => {
     assert.deepEqual(v({ fldSrc: null }), []);
+  });
+});
+
+// ---- dashboard + reports math ----
+describe("byCategory kind param", () => {
+  test("kind 'in' groups money in by category (source / Client payment)", () => {
+    const { entries } = build([inv({ amount: 300 })], [ex({ amount: 50 })],
+      { income: [inc({ id: "a", amount: 100, source: "Retainer" }), inc({ id: "b", amount: 100, source: "Retainer" })] });
+    const r = byCategory(entries, "in");
+    assert.deepEqual(r.map(x => [x.category, x.out, x.count]), [["Client payment", 30000, 1], ["Retainer", 20000, 2]]);
+    assert.equal(r[0].share, 0.6);
+  });
+  test("default is still money out", () => {
+    const { entries } = build([inv()], [ex({ amount: 50 })]);
+    assert.deepEqual(byCategory(entries).map(x => x.category), ["Other"]);
+  });
+});
+
+describe("dailySeries", () => {
+  test("one point per calendar day, carrying balance, opening from earlier months", () => {
+    const { entries } = build(
+      [inv({ id: "i1", amount: 1000, paid: "2026-05-20" })],
+      [ex({ id: "e1", amount: 100, date: "2026-06-03" }), ex({ id: "e2", amount: 50, date: "2026-06-03" })],
+      { income: [inc({ id: "c1", amount: 400, date: "2026-06-10" })] });
+    const r = dailySeries(entries, "2026-06");
+    assert.equal(r.opening, 100000);
+    assert.equal(r.days.length, 30);
+    assert.deepEqual(r.days[0], { date: "2026-06-01", in: 0, out: 0, balance: 100000 });
+    assert.deepEqual(r.days[2], { date: "2026-06-03", in: 0, out: 15000, balance: 85000 });
+    assert.equal(r.days[8].balance, 85000);
+    assert.deepEqual(r.days[9], { date: "2026-06-10", in: 40000, out: 0, balance: 125000 });
+    assert.equal(r.days[29].balance, 125000);
+  });
+  test("February in a leap year has 29 days; empty ledger uses opening option", () => {
+    const { entries } = build([], [], { opening: 777 });
+    const r = dailySeries(entries, "2028-02");
+    assert.equal(r.days.length, 29);
+    assert.equal(r.opening, 777);
+    assert.ok(r.days.every(d => d.balance === 777));
+  });
+  test("entries after the month do not leak into its balance", () => {
+    const { entries } = build([], [ex({ amount: 10, date: "2026-07-01" })]);
+    const r = dailySeries(entries, "2026-06");
+    assert.ok(r.days.every(d => d.balance === 0 && d.out === 0));
+  });
+});
+
+describe("monthlySeries", () => {
+  test("12 months Jan-Dec with in/out/net and closing balance carried", () => {
+    const { entries } = build(
+      [inv({ id: "i1", amount: 1000, paid: "2025-12-05" }), inv({ id: "i2", amount: 500, paid: "2026-03-01" })],
+      [ex({ id: "e1", amount: 200, date: "2026-03-09" })]);
+    const r = monthlySeries(entries, "2026");
+    assert.equal(r.length, 12);
+    assert.deepEqual(r.map(m => m.month).slice(0, 3), ["2026-01", "2026-02", "2026-03"]);
+    assert.deepEqual(r[0], { month: "2026-01", in: 0, out: 0, net: 0, closing: 100000 });
+    assert.deepEqual(r[2], { month: "2026-03", in: 50000, out: 20000, net: 30000, closing: 130000 });
+    assert.equal(r[11].closing, 130000);
+  });
+});
+
+describe("toCSV", () => {
+  test("header, oldest first, peso decimals, signed columns", () => {
+    const { entries } = build([inv({ amount: 1000.5, paid: "2026-06-01", no: "A-1", client: "" })], [ex({ amount: 99.99, date: "2026-06-02", desc: "Figma" })]);
+    const lines = toCSV(entries).split("\r\n");
+    assert.equal(lines[0], "Date,Type,Category,Description,In,Out,Balance");
+    assert.equal(lines[1], "2026-06-01,In,Client payment,A-1,1000.50,,1000.50");
+    assert.equal(lines[2], "2026-06-02,Out,Other,Figma,,99.99,900.51");
+  });
+  test("quotes commas and quotes, neutralises spreadsheet formulas", () => {
+    const { entries } = build([], [ex({ desc: 'Lunch, "team"', date: "2026-06-02" }), ex({ id: "e2", desc: "=HYPERLINK(1)", date: "2026-06-03" })]);
+    const lines = toCSV(entries).split("\r\n");
+    assert.equal(lines[1].split(",").slice(3).join(","), '"Lunch, ""team""",,100.00,-100.00');
+    assert.ok(lines[2].includes(",'=HYPERLINK(1),"));
+  });
+  test("negative balance keeps a minus sign", () => {
+    const { entries } = build([], [ex({ amount: 5 })]);
+    assert.ok(toCSV(entries).endsWith(",-5.00"));
   });
 });

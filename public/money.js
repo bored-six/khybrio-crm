@@ -153,10 +153,10 @@ export function byMonth(entries) {
   return [...m.values()].sort((a, b) => cmp(b.month, a.month));
 }
 
-export function byCategory(entries) {
+export function byCategory(entries, kind = "out") {
   const m = new Map();
   for (const e of entries) {
-    if (e.kind !== "out") continue;
+    if (e.kind !== kind) continue;
     const b = m.get(e.category) || { category: e.category, out: 0, count: 0, share: 0 };
     b.out += e.amount;
     b.count += 1;
@@ -203,4 +203,59 @@ function validateMoneyFields(fields, fid, create, selKey, allowed) {
   if (has("date") && !realDate(v("date"))) errs.push("date must be a real YYYY-MM-DD date");
   if (has(selKey) && v(selKey) !== null && !allowed.includes(v(selKey))) errs.push(`${selKey} is not an allowed option`);
   return errs;
+}
+
+// Balance carried into the start of month mk (entries are newest first).
+function openingFor(entries, mk) {
+  const prev = entries.find(e => e.month < mk);
+  if (prev) return prev.balance;
+  return typeof entries.opening === "number" ? entries.opening : 0;
+}
+
+const daysIn = mk => { const [y, m] = mk.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+
+export function dailySeries(entries, mk) {
+  const opening = openingFor(entries, mk);
+  const n = daysIn(mk);
+  const days = [];
+  for (let d = 1; d <= n; d++) days.push({ date: `${mk}-${String(d).padStart(2, "0")}`, in: 0, out: 0, balance: 0 });
+  for (const e of entries) {
+    if (e.month !== mk) continue;
+    const day = days[Number(e.date.slice(8, 10)) - 1];
+    if (e.kind === "in") day.in += e.amount; else day.out += e.amount;
+  }
+  let bal = opening;
+  for (const day of days) { bal += day.in - day.out; day.balance = bal; }
+  return { opening, days };
+}
+
+export function monthlySeries(entries, year) {
+  const out = [];
+  let bal = openingFor(entries, `${year}-01`);
+  for (let i = 1; i <= 12; i++) {
+    const month = `${year}-${String(i).padStart(2, "0")}`;
+    const t = totals(entries.filter(e => e.month === month));
+    bal += t.net;
+    out.push({ month, in: t.in, out: t.out, net: t.net, closing: bal });
+  }
+  return out;
+}
+
+const pesoPlain = c => (c < 0 ? "-" : "") + (Math.abs(c) / 100).toFixed(2);
+function csvCell(v) {
+  let s = String(v ?? "");
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // stop spreadsheets running it as a formula
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+export function toCSV(entries) {
+  const rows = [["Date", "Type", "Category", "Description", "In", "Out", "Balance"].join(",")];
+  for (const e of entries.slice().reverse()) {
+    rows.push([
+      e.date, e.kind === "in" ? "In" : "Out", csvCell(e.category), csvCell(e.label),
+      e.kind === "in" ? pesoPlain(e.amount) : "", e.kind === "out" ? pesoPlain(e.amount) : "",
+      pesoPlain(e.balance),
+    ].join(","));
+  }
+  return rows.join("\r\n");
 }
