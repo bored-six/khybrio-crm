@@ -295,6 +295,12 @@ table.ledger td.bal{font-weight:600}
 table.ledger td.bal.neg{color:var(--hot)}
 table.ledger tr.opening td{background:var(--sunk);color:var(--muted);font-style:italic;cursor:default}
 .ledger-list{display:none}
+.racts{display:inline-flex;gap:2px;margin-left:auto;white-space:nowrap}
+.ib{border:0;background:none;color:var(--muted);cursor:pointer;width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center}
+.ib:hover{background:var(--sunk);color:var(--ink)}
+.ib.del:hover{color:var(--hot)}
+.btn.danger{color:var(--hot);border-color:color-mix(in srgb,var(--hot) 45%,var(--line));margin-right:auto}
+@media (max-width:560px){.ib{width:44px;height:44px}}
 @media (max-width:560px){table.ledger,.tablewrap:has(table.ledger){display:none}.ledger-list{display:flex}.kpis.money{grid-template-columns:1fr 1fr}.monthnav{order:3;width:100%;justify-content:space-between}.monthnav .btn.small{min-height:44px}}
 </style>
 </head>
@@ -486,6 +492,11 @@ async function write(method,tbl,records){
   finally{busy--;setSync();loadAll()}}
 const createRec=(tbl,fields)=>write("POST",tbl,[{fields}]);
 const updateRec=(tbl,id,fields)=>write("PATCH",tbl,[{id,fields}]);
+async function deleteRec(tbl,id){
+  busy++;setSync();
+  try{return await api("DELETE",{table:T[tbl].id,ids:[id]})}
+  catch(e){if(e.code!=="login")toast("Not deleted: "+e.message,true);throw e}
+  finally{busy--;setSync();loadAll()}}
 function logActivity(clientId,summary,type,extra){
   const f=T.AC.f,fields={[f.summary]:summary,[f.client]:[clientId],[f.type]:type||"Note",[f.date]:todayStr()};
   if(me.email)fields[f.by]={email:me.email};
@@ -629,7 +640,11 @@ function openForm(kind,rec,ctx){
   const sheet=h("div",{class:"sheet",role:"dialog","aria-modal":"true","aria-label":title},
     h("header",null,h("h2",{text:title}),h("button",{class:"btn ghost small",type:"button","aria-label":"Close",text:"✕",onclick:close})),
     form,
-    h("footer",null,filesNote,h("button",{class:"btn",type:"button",text:"Cancel",onclick:close}),save));
+    h("footer",null,filesNote,
+      editing&&(kind==="expense"||kind==="income")?h("button",{class:"btn danger",type:"button",text:"Delete",onclick:async()=>{
+        if(!confirm(`Delete "${rec.desc||"this entry"}"? It is removed from Airtable too.`))return;
+        try{await deleteRec(tbl,rec.id);toast("Deleted");close()}catch(e){err.textContent="Not deleted: "+(e&&e.message||"")}}}):null,
+      h("button",{class:"btn",type:"button",text:"Cancel",onclick:close}),save));
   save.addEventListener("click",e=>{e.preventDefault();form.requestSubmit()});
   const modal=h("div",{class:"modal",onclick:e=>{if(e.target===modal)close()}},dl,sheet);
   $("#modalHost").replaceChildren(modal);
@@ -766,6 +781,7 @@ function viewBilling(){return loadingOr(["QU","CO","IN","CL"],()=>{
 
 /* ---------- money ---------- */
 const svgI=(inner,w)=>{const s=document.createElement("span");s.style.cssText="display:inline-flex;flex:0 0 auto";s.innerHTML=`<svg viewBox="0 0 16 16" width="${w||14}" height="${w||14}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;return s};
+const G_EDIT='<path d="M2.5 13.5l.8-3.2 7.4-7.4 2.4 2.4-7.4 7.4z"/><path d="M9.3 4.3l2.4 2.4"/>',G_DEL='<path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.6 8.5h6.8l.6-8.5"/>';
 const G_PREV='<path d="M10 3.5 5.5 8 10 12.5"/>',G_NEXT='<path d="M6 3.5 10.5 8 6 12.5"/>',G_IN='<path d="M12 4 5 11M5 6v5h5"/><path d="M3 14h10"/>',G_OUT='<path d="M4 12 11 5M6 5h5v5"/><path d="M3 2h10"/>';
 const mShift=(mk,n)=>{const p=mk.split("-").map(Number);return new Date(Date.UTC(p[0],p[1]-1+n,1)).toISOString().slice(0,7)};
 const mLabel=(mk,short)=>new Date(mk+"-01T00:00:00Z").toLocaleDateString("en-US",short?{month:"short",timeZone:"UTC"}:{month:"long",year:"numeric",timeZone:"UTC"});
@@ -811,11 +827,20 @@ function downloadCSV(name,text){const a=h("a",{href:URL.createObjectURL(new Blob
 function viewMoney(part){
   if(!M)return Mfail?h("div",{class:"banner bad"},h("p",{text:"The Money Tracker couldn't load its script. Refresh the page."})):h("div",{class:"card skel",text:"Loading from Airtable…"});
   return loadingOr(["IN","EX","IC"],()=>{
-    const F=fx.money,today=todayStr(),cur=today.slice(0,7);if(!F.month)F.month=cur;const mk=F.month,ml=mLabel(mk),pk=mShift(mk,-1),pl=mLabel(pk,1);
+    const F=fx.money,today=todayStr(),cur=today.slice(0,7);
     const {entries,problems}=M.buildLedger(S.IN,S.EX,{today,income:S.IC,clientName:x=>clientsFor(Array.isArray(x)?x:[x])});
+    // First visit: open on the latest month that has entries, so an empty current month doesn't hide the data.
+    if(!F.month)F.month=entries.some(e=>e.month===cur)||!entries.length?cur:(entries.find(e=>e.month<=cur)||entries[0]).month;
+    const mk=F.month,ml=mLabel(mk),pk=mShift(mk,-1),pl=mLabel(pk,1);
     const mine=entries.filter(e=>e.month===mk),tot=M.totals(mine),ptot=M.totals(entries.filter(e=>e.month===pk));
     const kindOf=ref=>ref==="IN"?"invoice":ref==="IC"?"income":"expense";
     const open=e=>{const r=byId(e.ref,e.id);if(r)openForm(kindOf(e.ref),r)};
+    const del=async e=>{if(!confirm(`Delete "${e.label||"this entry"}" (${peso(e.amount/100)} on ${fdate(e.date)})? It is removed from Airtable too.`))return;
+      try{await deleteRec(e.ref,e.id);toast("Deleted")}catch(x){}};
+    // Edit and delete buttons for a row. Paid invoices are edited in Quotes & billing, so they get Edit only.
+    const acts=e=>h("span",{class:"racts",onclick:ev=>ev.stopPropagation()},
+      h("button",{class:"ib",type:"button","aria-label":"Edit "+(e.label||"entry"),title:"Edit",onclick:()=>open(e)},svgI(G_EDIT,15)),
+      e.ref==="IN"?null:h("button",{class:"ib del",type:"button","aria-label":"Delete "+(e.label||"entry"),title:"Delete",onclick:()=>del(e)},svgI(G_DEL,15)));
     const add=()=>h("button",{class:"btn small primary",type:"button",text:"+ Add money",onclick:()=>openForm(lastMoneyKind)});
     const monthNav=()=>h("div",{class:"monthnav"},
       h("button",{class:"btn small ghost",type:"button","aria-label":"Previous month",onclick:()=>{F.month=mShift(mk,-1);render()}},svgI(G_PREV)),
@@ -832,7 +857,7 @@ function viewMoney(part){
     const wrapV=(...kids)=>h("div",{class:"mstack"},...kids);
     const amt=e=>h("span",{class:"mono",style:e.kind==="in"?"color:var(--ok)":null,text:mSigned(e.signed)});
     const entryList=(list,emptyText)=>list.length?h("div",{class:"list"},list.map(e=>h("div",{class:"li"},h("span",{class:"t",text:e.label||"(no description)",onclick:()=>open(e)}),amt(e),
-      h("div",{class:"m"},h("span",{text:fdate(e.date)+(e.future?" · upcoming":"")}),pill(e.category,e.kind==="in"?"f-ok":"s-early"))))):h("div",{class:"empty",text:emptyText});
+      h("div",{class:"m"},h("span",{text:fdate(e.date)+(e.future?" · upcoming":"")}),pill(e.category,e.kind==="in"?"f-ok":"s-early"),acts(e))))):h("div",{class:"empty",text:emptyText});
 
     /* ---- overview ---- */
     if(part==="overview"){
@@ -877,9 +902,9 @@ function viewMoney(part){
       const trend=chart({n:6,h:150,lo:0,hi:Math.max(1,...vals),title:`${isIn?"Money in":"Money out"} by month`,
         marks:(svg,X,Y)=>{const w=1000/6*.5;vals.forEach((v,i)=>{if(v)svg.append(se("rect",{class:(isIn?"bin":"bout")+(span[i]===mk?"":" dim"),x:X(i)-w/2,width:w,y:Y(v),height:150-Y(v)}))})},
         xlab:span.map((m,i)=>[i,mLabel(m,1)]),tip:i=>({title:mLabel(span[i]),rows:[[isIn?"In":"Out",peso(vals[i]/100),part]]})});
-      const rows=side.map(e=>h("tr",{onclick:()=>open(e)},h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{class:"wrapcell",text:e.label||"–"}),h("td",null,pill(e.category,isIn?"f-ok":"s-early")),h("td",{class:"r mono"+(isIn?" in":""),text:peso(e.amount/100)})));
-      const table=side.length?[h("div",{class:"tablewrap hide-sm"},h("table",{class:"ledger"},h("thead",null,h("tr",null,["Date","Description",isIn?"Source":"Category","Amount"].map((t,i)=>h("th",{class:i===3?"r":null,text:t})))),h("tbody",null,rows),
-          h("tfoot",null,h("tr",null,h("td",{text:"Total"}),h("td"),h("td"),h("td",{class:"r mono",text:peso(now/100)}))))),h("div",{class:"card show-sm"},entryList(side,""))]
+      const rows=side.map(e=>h("tr",{onclick:()=>open(e)},h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{class:"wrapcell",text:e.label||"–"}),h("td",null,pill(e.category,isIn?"f-ok":"s-early")),h("td",{class:"r mono"+(isIn?" in":""),text:peso(e.amount/100)}),h("td",{class:"r"},acts(e))));
+      const table=side.length?[h("div",{class:"tablewrap hide-sm"},h("table",{class:"ledger"},h("thead",null,h("tr",null,["Date","Description",isIn?"Source":"Category","Amount",""].map((t,i)=>h("th",{class:i>=3?"r":null,text:t})))),h("tbody",null,rows),
+          h("tfoot",null,h("tr",null,h("td",{text:"Total"}),h("td"),h("td"),h("td",{class:"r mono",text:peso(now/100)}),h("td"))))),h("div",{class:"card show-sm"},entryList(side,""))]
         :h("div",{class:"card empty",text:`Nothing ${isIn?"came in":"went out"} in ${ml}.`});
       return wrapV(head(isIn?"Money in":"Money out",monthNav()),notices,k,
         h("div",{class:"grid2"},h("div",{class:"card"},h("div",{class:"section-head",style:"margin-bottom:12px"},h("h2",{text:isIn?"By source":"By category"})),catBars(cats,part,"Nothing yet.")),
@@ -930,18 +955,18 @@ function viewMoney(part){
     const body=rows.map(e=>{const isIn=e.kind==="in";return h("tr",{onclick:()=>open(e)},
       h("td",{class:"mono",text:fdate(e.date)+(e.future?" (upcoming)":"")}),h("td",{class:"wrapcell",text:e.label||"–"}),h("td",null,pill(e.category,isIn?"f-ok":"s-early")),
       h("td",{class:"r mono in"},isIn?mSigned(e.signed):dash()),h("td",{class:"r mono out"},isIn?dash():mSigned(e.signed)),
-      h("td",{class:"r mono bal"+(e.balance<0?" neg":"")},mBal(e.balance)))});
-    const openRow=filtered?null:h("tr",{class:"opening"},h("td",{colspan:"5",text:"Carried from "+pl}),h("td",{class:"r mono",text:mBal(opening)}));
+      h("td",{class:"r mono bal"+(e.balance<0?" neg":"")},mBal(e.balance)),h("td",{class:"r"},acts(e)))});
+    const openRow=filtered?null:h("tr",{class:"opening"},h("td",{colspan:"5",text:"Carried from "+pl}),h("td",{class:"r mono",text:mBal(opening)}),h("td"));
     const table=h("table",{class:"ledger"},
-      h("thead",null,h("tr",null,["Date","Description","Category","In","Out","Balance"].map((t,i)=>h("th",{class:i>=3?"r":null,text:t})))),
+      h("thead",null,h("tr",null,["Date","Description","Category","In","Out","Balance",""].map((t,i)=>h("th",{class:i>=3?"r":null,text:t})))),
       h("tbody",null,openRow,body),
-      rows.length?h("tfoot",null,h("tr",null,h("td",{text:filtered?"Shown total":"Month total"}),h("td"),h("td"),h("td",{class:"r mono",text:"+"+peso(stot.in/100)}),h("td",{class:"r mono",text:"−"+peso(stot.out/100)}),h("td",{class:"r mono"+(closing<0?" neg":""),text:filtered?"":mBal(closing)}))):null);
+      rows.length?h("tfoot",null,h("tr",null,h("td",{text:filtered?"Shown total":"Month total"}),h("td"),h("td"),h("td",{class:"r mono",text:"+"+peso(stot.in/100)}),h("td",{class:"r mono",text:"−"+peso(stot.out/100)}),h("td",{class:"r mono"+(closing<0?" neg":""),text:filtered?"":mBal(closing)}),h("td"))):null);
     const li=(title,right,meta,cls,click)=>h("div",{class:"li"+(cls?" "+cls:"")},h("span",{class:"t",text:title,onclick:click}),right,h("div",{class:"m"},meta));
     const list=h("div",{class:"card list ledger-list"},
       filtered?null:li("Carried from "+pl,h("span",{class:"mono muted",text:mBal(opening)}),null,"muted"),
       rows.map(e=>{const isIn=e.kind==="in";return li(e.label||"–",
         h("span",{class:"mono",style:"display:inline-flex;align-items:center;gap:5px"+(isIn?";color:var(--ok)":""),"aria-label":isIn?"Money in":"Money out"},svgI(isIn?G_IN:G_OUT),mSigned(e.signed)),
-        [h("span",{text:fdate(e.date)}),pill(e.category,isIn?"f-ok":"s-early"),h("span",{class:e.balance<0?"":"muted",style:e.balance<0?"color:var(--hot)":null,text:"Bal "+mBal(e.balance)})],null,()=>open(e))}),
+        [h("span",{text:fdate(e.date)}),pill(e.category,isIn?"f-ok":"s-early"),h("span",{class:e.balance<0?"":"muted",style:e.balance<0?"color:var(--hot)":null,text:"Bal "+mBal(e.balance)}),acts(e)],null,()=>open(e))}),
       rows.length&&!filtered?li("Closing balance",h("span",{class:"mono muted",text:mBal(closing)}),null,"muted"):null);
     const empty=h("div",{class:"card empty"},h("p",{style:"margin:0 0 10px",text:filtered?"Nothing matches these filters.":`Nothing in or out for ${ml}. Add money, or mark an invoice Paid in Quotes & billing and it shows up here.`}),filtered?h("button",{class:"btn small",type:"button",text:"Clear filters",onclick:()=>{F.ledger={kind:"",cat:"",q:""};render()}}):add());
     return wrapV(head("Ledger",monthNav(),exp),notices,
