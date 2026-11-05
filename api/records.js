@@ -102,6 +102,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ records: (out.records || []).map(shape) });
     }
 
+    if (req.method === "DELETE") {
+      // Only manual money entries can be removed from the site.
+      if (table !== EXPENSES && table !== INCOME) return res.status(400).json({ error: "bad_table", message: "Only expenses and income can be deleted here." });
+      const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String) : [];
+      if (!ids.length || ids.length > 10 || ids.some((id) => !/^rec[A-Za-z0-9]{14}$/.test(id))) return res.status(400).json({ error: "bad_record_id" });
+      const out = await airtable(`${table}?${ids.map((id) => `records[]=${encodeURIComponent(id)}`).join("&")}`, { method: "DELETE" });
+      return res.status(200).json({ records: out.records || [] });
+    }
+
     return res.status(405).json({ error: "method_not_allowed" });
   } catch (e) {
     const status = e.status === 401 || e.status === 403 ? 502 : e.status || 502;
